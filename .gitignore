@@ -1,0 +1,32 @@
+# Python
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+.env
+backend/.env
+backend/data/*.db
+backend/data/*.db-journal
+backend/data/prices/
+backend/data/exports/
+backend/data/backups/
+backend/logs/
+backend/install.log
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/install.log
+
+# IDE
+.idea/
+.vscode/
+.claude/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log
+tunnel.log
