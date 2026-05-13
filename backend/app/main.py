@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import models  # noqa: F401  -- ensures models are registered with Base
 from app.config import ensure_directories, settings
 from app.database import Base, engine
-from app.routes import admin, assets, auth, export, optimize, portfolios, users
+from app.routes import admin, assets, auth, config as config_route, export, optimize, portfolios, users
 
 
 def configure_logging() -> None:
@@ -46,6 +46,7 @@ def create_app() -> FastAPI:
 
     Base.metadata.create_all(bind=engine)
 
+    app.include_router(config_route.router, prefix="/api")
     app.include_router(auth.router, prefix="/api")
     app.include_router(users.router, prefix="/api")
     app.include_router(assets.router, prefix="/api")
@@ -56,11 +57,18 @@ def create_app() -> FastAPI:
 
     @app.get("/api/health")
     def health():
-        return {"status": "ok", "service": "Portfolio Lab"}
+        return {
+            "status": "ok",
+            "service": "Portfolio Lab",
+            "mode": settings.DEPLOYMENT_MODE,
+        }
 
     @app.on_event("startup")
     def on_startup():
-        logger.info("Portfolio Lab API starting up")
+        logger.info(
+            "Portfolio Lab API starting up (deployment_mode=%s)",
+            settings.DEPLOYMENT_MODE,
+        )
 
     return app
 

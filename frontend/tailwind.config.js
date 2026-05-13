@@ -4,6 +4,14 @@ export default {
   darkMode: "class",
   theme: {
     extend: {
+      screens: {
+        // Extra-small breakpoint for mid-range phones (iPhone SE = 375 px,
+        // Galaxy S24 = 360 px). Tailwind's default `sm:` (640 px) is too
+        // wide for phone-only tweaks. `xs:` lights up at 420 px so the
+        // larger phones (Pro/Pro Max, Ultra, 14+) get tighter copy than the
+        // smallest devices but still smaller than tablet `sm:`.
+        xs: "420px",
+      },
       colors: {
         bg: {
           DEFAULT: "#070A12",

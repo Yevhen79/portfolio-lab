@@ -11,12 +11,66 @@ SQRT_12 = np.sqrt(12.0)
 
 
 def portfolio_return_annual(weights: np.ndarray, mu_monthly: np.ndarray) -> float:
+    """Arithmetic-mean annualised return: μ_a = μ_m × 12.
+
+    This is the quantity Markowitz uses internally (single-period model).
+    For long-horizon investor expectations use `portfolio_cagr` instead —
+    arithmetic mean is biased upward by variance drag.
+    """
     return float(weights @ mu_monthly) * 12.0
 
 
 def portfolio_vol_annual(weights: np.ndarray, sigma_monthly: np.ndarray) -> float:
     var_monthly = max(float(weights @ sigma_monthly @ weights), 0.0)
     return float(np.sqrt(var_monthly) * SQRT_12)
+
+
+def cagr_from_returns(returns: np.ndarray) -> float:
+    """Compound annual growth rate from a series of monthly returns.
+
+    CAGR = ((1+r_1) × (1+r_2) × … × (1+r_n))^(12/n) − 1
+
+    This is the *geometric* mean annual return — what a buy-and-hold
+    investor would actually have realised. For high-variance assets
+    (crypto, VIX, levered ETFs) CAGR is much lower than the arithmetic μ×12;
+    that gap is the variance drag.
+    """
+    if returns.size == 0:
+        return 0.0
+    growth = np.prod(1.0 + returns)
+    if growth <= 0:
+        return -1.0  # total loss
+    n = returns.size
+    return float(growth ** (12.0 / n) - 1.0)
+
+
+def portfolio_cagr(weights: np.ndarray, returns_df: pd.DataFrame) -> float:
+    """Geometric CAGR of a portfolio using its realised historical returns.
+
+    NaN rows (assets whose history is shorter than others) are dropped — CAGR
+    is computed only over the joint window where every asset has data.
+    """
+    if returns_df.empty:
+        return 0.0
+    df = returns_df.dropna(how="any")
+    if df.empty:
+        return 0.0
+    port_returns = df.values @ weights
+    return cagr_from_returns(port_returns)
+
+
+def asset_cagr_series(returns_df: pd.DataFrame) -> Dict[str, float]:
+    """Per-asset CAGR over each column's own full history (no common-window crop).
+
+    Useful for sanity-checking individual assets — e.g. VIX with arithmetic
+    μ ≈ +30%/yr but CAGR ≈ −5%/yr (variance drag dominates).
+    """
+    out: Dict[str, float] = {}
+    for col in returns_df.columns:
+        s = returns_df[col].dropna()
+        if len(s) > 0:
+            out[col] = cagr_from_returns(s.values)
+    return out
 
 
 def sharpe_ratio_annual(
@@ -32,19 +86,34 @@ def sharpe_ratio_annual(
 def sortino_ratio_annual(
     weights: np.ndarray, returns_df: pd.DataFrame, rf_annual: float
 ) -> float:
-    """Computed from historical monthly portfolio returns (downside deviation)."""
+    """Sortino ratio annualised, using the standard textbook definition.
+
+    Standard Sortino divides by **total** observations N, treating the
+    non-downside months as zero contributions to the squared sum. The earlier
+    implementation divided by N_downside which inflates the denominator and
+    understates the ratio by √(N_total / N_downside).
+
+    Reference: Sortino & Price (1994); Bacon, "Practical Portfolio Performance
+    Measurement and Attribution" (2nd ed.), ch. 4.
+    """
     if returns_df.empty:
         return 0.0
-    port_returns = (returns_df.values @ weights)
-    rf_monthly = rf_annual / 12.0
+    # Crop to the joint window so weights × returns is well-defined.
+    df = returns_df.dropna(how="any")
+    if df.empty:
+        return 0.0
+    port_returns = df.values @ weights
+    n_total = port_returns.size
+    rf_monthly = (1.0 + rf_annual) ** (1.0 / 12.0) - 1.0
     excess = port_returns - rf_monthly
-    downside = excess[excess < 0]
-    if len(downside) == 0:
+    downside = np.where(excess < 0, excess, 0.0)
+    if not (downside < 0).any():
         return float("inf")
-    downside_dev_monthly = np.sqrt(np.mean(downside ** 2))
+    # Standard formula: √(Σ(downside²) / N_total), not the bugged √(mean(downside²))
+    downside_dev_monthly = float(np.sqrt(np.sum(downside ** 2) / n_total))
     if downside_dev_monthly < 1e-9:
         return 0.0
-    mean_excess_monthly = excess.mean()
+    mean_excess_monthly = float(excess.mean())
     return float((mean_excess_monthly / downside_dev_monthly) * SQRT_12)
 
 
@@ -94,10 +163,16 @@ def _inv_normal_cdf(p: float) -> float:
 
 
 def historical_max_drawdown(weights: np.ndarray, returns_df: pd.DataFrame) -> float:
-    """Compute historical maximum drawdown from in-sample monthly returns."""
+    """Compute historical maximum drawdown from in-sample monthly returns.
+
+    Requires the joint (common-window) returns frame; NaN rows are dropped.
+    """
     if returns_df.empty:
         return 0.0
-    port_returns = (returns_df.values @ weights)
+    df = returns_df.dropna(how="any")
+    if df.empty:
+        return 0.0
+    port_returns = df.values @ weights
     equity = np.cumprod(1.0 + port_returns)
     peak = np.maximum.accumulate(equity)
     drawdown = (equity - peak) / peak

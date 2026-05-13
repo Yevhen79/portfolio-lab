@@ -1,10 +1,57 @@
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
+
+
+# ---------------------------------------------------------------------------
+# Dual-version feature flags
+# ---------------------------------------------------------------------------
+# The same codebase ships as two products:
+#   * "personal"      — full version, used by the project owner and (later)
+#                       sold as retail SaaS. All features ON.
+#   * "libertex_lite" — gift / B2B-trial version. Stripped-down feature set
+#                       so Libertex (or any partner) can deploy without
+#                       getting the premium IP (Black-Litterman, broker API,
+#                       advanced metrics, etc.).
+#
+# Setting DEPLOYMENT_MODE in .env switches the active set. Code calls
+# `settings.feature("xyz")` to gate behaviour, and the same dict is exposed
+# to the frontend via /api/config so the UI hides locked controls.
+
+FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
+    "personal": {
+        # Hard cap. Live Libertex catalogue is ~1500; this leaves headroom.
+        # Frontend slider exposes up to 1500 explicitly via an "All" button.
+        "max_assets":         2000,
+        "advanced_metrics":   True,    # Sortino, Calmar, Omega, Treynor, etc.
+        "black_litterman":    True,    # subjective views overlay
+        "monte_carlo":        True,
+        "custom_constraints": True,    # max-weight, sector caps, ESG screens
+        "broker_api":         True,    # live execution via partner APIs
+        "export_formats":     ["pdf", "excel", "csv"],
+        "cov_methods":        ["sample", "ewma", "ledoit_wolf"],
+        "geometric_mean":     True,    # show CAGR alongside arithmetic μ
+        "history_max_years":  25,
+        "monte_carlo_sims":   5000,
+    },
+    "libertex_lite": {
+        "max_assets":         50,
+        "advanced_metrics":   False,
+        "black_litterman":    False,
+        "monte_carlo":        False,
+        "custom_constraints": False,
+        "broker_api":         False,
+        "export_formats":     ["pdf"],
+        "cov_methods":        ["ledoit_wolf"],
+        "geometric_mean":     True,    # still show CAGR — basic sanity, no IP
+        "history_max_years":  10,
+        "monte_carlo_sims":   1000,
+    },
+}
 
 
 class Settings(BaseSettings):
@@ -38,11 +85,22 @@ class Settings(BaseSettings):
     MONTE_CARLO_SIMULATIONS: int = 5000
     SPARSIFICATION_THRESHOLD: float = 0.01
 
+    DEPLOYMENT_MODE: str = "personal"  # "personal" | "libertex_lite"
+
     CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     @property
     def cors_origins_list(self) -> List[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def features(self) -> Dict[str, Any]:
+        """Active feature flags for the current DEPLOYMENT_MODE."""
+        return FEATURE_FLAGS.get(self.DEPLOYMENT_MODE, FEATURE_FLAGS["personal"])
+
+    def feature(self, name: str, default: Any = None) -> Any:
+        """Look up a single feature flag value for the active deployment mode."""
+        return self.features.get(name, default)
 
 
 settings = Settings()

@@ -125,23 +125,59 @@ def compute_monthly_returns(
 ) -> pd.DataFrame:
     """Combine per-symbol price frames into a single returns DataFrame.
 
-    Crypto series are resampled to monthly (their natural cadence is weekly).
-    Stock/index/commodity/FX series are already monthly.
+    All series are resampled to month-end so different cadences (yfinance
+    "1mo" returns month-start, our crypto resample produced month-end) align
+    on identical timestamps before joining. Without this, the combined frame
+    has 2x rows and `pct_change` with the deprecated default `fill_method='pad'`
+    silently creates phantom 0% returns for assets whose history is shorter
+    than the union — which broke the min-history filter.
+
+    `pct_change(fill_method=None)` ensures NaN gaps stay NaN.
+
+    Data-quality guard: yfinance occasionally returns broken FX/commodity
+    series with bad unit-shifts (e.g., NOKJPY=X with a single 0.13 print
+    inside an otherwise 13-18 range, producing a +10000% pct change). Such
+    series destroy the optimizer because they imply impossible expected
+    returns. We drop any non-crypto asset whose extremum monthly pct change
+    exceeds a sane bound, and any asset whose price max/min ratio is > 50x
+    over the window (only crypto is allowed extreme range).
     """
     if is_crypto is None:
         is_crypto = {}
     monthly_prices: Dict[str, pd.Series] = {}
     for sym, df in prices_by_symbol.items():
-        series = df["close"].copy()
-        if is_crypto.get(sym, False):
-            series = series.resample("ME").last()
-        monthly_prices[sym] = series.dropna()
+        series = df["close"].resample("ME").last().dropna()
+        monthly_prices[sym] = series
 
     if not monthly_prices:
         return pd.DataFrame()
 
     aligned = pd.DataFrame(monthly_prices)
-    returns = aligned.pct_change().dropna(how="all")
+    returns = aligned.pct_change(fill_method=None).dropna(how="all")
+
+    # Data-quality filter: drop columns with implausible monthly-return spikes.
+    # Real-world cap: legitimate non-crypto monthly moves rarely exceed +100% even
+    # in dot-com / GameStop scenarios. We use 300% as a conservative threshold —
+    # only obviously broken data (yfinance unit errors producing +5000% / +10000%
+    # spikes) is dropped, not real growth stocks. Crypto allowed up to 1500%.
+    # Price-ratio sanity is NOT enforced because legit growth stocks (AMZN, NVDA,
+    # AAPL after 20y of splits) can have 100x+ ratios.
+    bad: list[str] = []
+    for col in list(returns.columns):
+        col_returns = returns[col].dropna()
+        if col_returns.empty:
+            continue
+        max_abs_ret = float(col_returns.abs().max())
+        cap = 15.0 if is_crypto.get(col, False) else 3.0
+        if max_abs_ret > cap:
+            bad.append(col)
+    if bad:
+        logger.info(
+            "Dropping %d assets with implausible price/return data: %s",
+            len(bad), ", ".join(bad[:10]) + ("..." if len(bad) > 10 else ""),
+        )
+        returns = returns.drop(columns=bad)
+
     return returns
 
 

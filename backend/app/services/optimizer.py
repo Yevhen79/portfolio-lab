@@ -24,25 +24,54 @@ def estimate_mu_sigma(
 ) -> Tuple[np.ndarray, np.ndarray, List[str]]:
     """Estimate the mean vector and covariance matrix from monthly returns.
 
-    `returns` -- DataFrame indexed by date, columns are assets.
+    `returns` -- DataFrame indexed by date, columns are assets. Each column
+    can have its own start date / NaN gaps before its first valid observation.
+
+    HYBRID estimation (the historically buggy line `returns.dropna(how='any')`
+    used to throw away ~14 years of AAPL data just because some other asset
+    in the universe had only 6 years):
+
+      * μ[i]  — per-asset arithmetic mean over each column's *full* history
+                (`skipna=True`). A 20-year stock contributes 20 years to its
+                own μ, even when other assets in the joint frame are younger.
+
+      * Σ     — joint estimator (sample / EWMA / Ledoit-Wolf) needs paired
+                observations, so it's still computed on the longest common
+                window. The cropping here cannot be avoided without resorting
+                to pairwise-missing covariance (which does not guarantee PSD).
+
+    This hybrid is the practical compromise used in most textbooks and is
+    materially closer to the truth than the previous double-cropping.
     """
-    returns = returns.dropna(how="any")
     columns = list(returns.columns)
     if returns.empty or len(columns) < 2:
         raise ValueError("Not enough data for estimation")
 
-    mu = returns.mean().values.astype(float)
+    # μ: per-asset mean using each column's own full history.
+    mu = returns.mean(skipna=True).values.astype(float)
 
-    if method == "sample":
-        sigma = returns.cov().values.astype(float)
-    elif method == "ewma":
-        weights = np.array([ewma_lambda ** i for i in range(len(returns) - 1, -1, -1)])
-        weights /= weights.sum()
-        centered = returns.values - mu
-        sigma = (centered.T * weights) @ centered
-    else:  # ledoit_wolf default
-        lw = LedoitWolf().fit(returns.values)
-        sigma = lw.covariance_.astype(float)
+    # Σ: joint estimator on the longest common window.
+    returns_common = returns.dropna(how="any")
+    if returns_common.shape[0] < 12:
+        # Common window shorter than 1 year → unreliable joint estimate.
+        # Fall back to per-asset variance with zero correlation rather than
+        # crashing — better to return a diagonal Σ than to fail.
+        diag_var = returns.var(skipna=True).values.astype(float)
+        sigma = np.diag(diag_var)
+    else:
+        if method == "sample":
+            sigma = returns_common.cov().values.astype(float)
+        elif method == "ewma":
+            mu_common = returns_common.mean().values
+            weights = np.array(
+                [ewma_lambda ** i for i in range(len(returns_common) - 1, -1, -1)]
+            )
+            weights /= weights.sum()
+            centered = returns_common.values - mu_common
+            sigma = (centered.T * weights) @ centered
+        else:  # ledoit_wolf default
+            lw = LedoitWolf().fit(returns_common.values)
+            sigma = lw.covariance_.astype(float)
 
     sigma = (sigma + sigma.T) / 2.0  # numerical symmetrization
     return mu, sigma, columns
@@ -57,13 +86,20 @@ def annualize(mu_monthly: np.ndarray, sigma_monthly: np.ndarray) -> Tuple[np.nda
 # ---------------------------------------------------------------------------
 
 def _solve(problem: cp.Problem) -> bool:
+    import logging
+    log = logging.getLogger(__name__)
+    last_err: Exception | None = None
+    last_status: str | None = None
     for solver in ("CLARABEL", "ECOS", "SCS", "OSQP"):
         try:
             problem.solve(solver=solver, verbose=False)
+            last_status = problem.status
             if problem.status in ("optimal", "optimal_inaccurate"):
                 return True
-        except Exception:
+        except Exception as exc:
+            last_err = exc
             continue
+    log.warning("All solvers failed. Last status=%s, last err=%s", last_status, last_err)
     return False
 
 
@@ -220,14 +256,20 @@ def sparsify_weights(
 def risk_tolerance_to_target_vol(risk_tolerance: str, vol_min: float, vol_max: float) -> float:
     """Map a categorical risk tolerance to a target annual volatility.
 
-    `vol_min` is the minimum-variance portfolio's annual vol;
-    `vol_max` is the volatility of the highest-mean asset.
+    Uses two ingredients:
+      1. Absolute caps so a universe with crazy crypto outliers (vol_max ≈ 200%)
+         doesn't blow the moderate target up to 100%+.
+      2. The GMVP volatility (`vol_min`) as the floor — we never set a target
+         below what's achievable.
     """
-    rng = max(vol_max - vol_min, 1e-6)
-    factor_map = {
-        "conservative": 0.20,
-        "moderate": 0.55,
-        "aggressive": 0.90,
+    abs_targets = {
+        "conservative": 0.10,
+        "moderate": 0.18,
+        "aggressive": 0.30,
     }
-    factor = factor_map.get(risk_tolerance.lower(), 0.55)
-    return vol_min + factor * rng
+    target = abs_targets.get(risk_tolerance.lower(), 0.18)
+    # Floor: must be ≥ GMVP vol (otherwise infeasible)
+    target = max(target, vol_min * 1.001)
+    # Cap: must be ≤ highest-vol single asset (above this is unreachable too)
+    target = min(target, vol_max * 0.999)
+    return target

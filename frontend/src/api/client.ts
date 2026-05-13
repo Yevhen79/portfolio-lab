@@ -4,7 +4,10 @@ const API_BASE = (import.meta as any).env?.VITE_API_BASE || "/api";
 
 export const api = axios.create({
   baseURL: API_BASE,
-  timeout: 120_000,
+  // Hot-cache optimize ≈ 5s, cold-cache 500-asset universe with yfinance
+  // misses can blow past 60s. 5 minutes gives breathing room without making
+  // a genuine backend hang silent forever.
+  timeout: 300_000,
 });
 
 api.interceptors.request.use((config) => {

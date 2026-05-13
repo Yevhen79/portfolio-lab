@@ -31,27 +31,27 @@ export default function Dashboard() {
   const bestSharpe = [...items].sort((a, b) => b.sharpe_ratio - a.sharpe_ratio)[0];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 sm:space-y-8">
       {/* Hero */}
-      <div className="card-glow p-8 relative overflow-hidden">
+      <div className="card-glow p-5 sm:p-8 relative overflow-hidden">
         <div className="absolute -top-32 -right-32 w-64 h-64 rounded-full bg-cyan/20 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-20 -left-20 w-48 h-48 rounded-full bg-magenta/15 blur-3xl pointer-events-none" />
         <div className="relative">
-          <div className="flex items-center gap-2 text-cyan text-xs uppercase tracking-widest font-semibold">
-            <Sparkles className="w-4 h-4" /> {t.dashboard.welcome}, {user?.name}
+          <div className="flex items-center gap-2 text-cyan text-[10px] sm:text-xs uppercase tracking-widest font-semibold">
+            <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {t.dashboard.welcome}, {user?.name}
           </div>
-          <h1 className="text-4xl font-bold mt-3 leading-tight max-w-3xl">
+          <h1 className="text-2xl sm:text-4xl font-bold mt-2 sm:mt-3 leading-tight max-w-3xl">
             {t.dashboard.hero_title_pre} <span className="neon-text">{t.dashboard.hero_title_em}</span>{t.dashboard.hero_title_post}
           </h1>
-          <p className="text-text-muted mt-3 max-w-2xl">{t.dashboard.hero_subtitle}</p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link to="/build" className="btn-primary inline-flex items-center gap-2">
+          <p className="text-xs sm:text-base text-text-muted mt-2 sm:mt-3 max-w-2xl">{t.dashboard.hero_subtitle}</p>
+          <div className="mt-4 sm:mt-6 flex flex-wrap gap-2 sm:gap-3">
+            <Link to="/build" className="btn-primary inline-flex items-center gap-2 text-sm">
               <Plus className="w-4 h-4" /> {t.dashboard.build_new}
             </Link>
-            <Link to="/history" className="btn-ghost inline-flex items-center gap-2">
+            <Link to="/history" className="btn-ghost inline-flex items-center gap-2 text-sm">
               <History className="w-4 h-4" /> {t.dashboard.view_history}
             </Link>
-            <Link to="/compare" className="btn-ghost inline-flex items-center gap-2">
+            <Link to="/compare" className="btn-ghost inline-flex items-center gap-2 text-sm">
               <GitCompare className="w-4 h-4" /> {t.dashboard.compare_btn}
             </Link>
           </div>
@@ -59,28 +59,28 @@ export default function Dashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card-glow p-5">
-          <div className="text-[11px] uppercase tracking-widest text-text-dim font-medium flex items-center gap-1.5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="card-glow p-4 sm:p-5">
+          <div className="text-[10px] sm:text-[11px] uppercase tracking-widest text-text-dim font-medium flex items-center gap-1.5">
             <BarChart3 className="w-3.5 h-3.5" /> {t.dashboard.my_portfolios}
           </div>
           <div className="metric-value text-cyan mt-2">{myPortfolios.length}</div>
         </div>
-        <div className="card-glow p-5">
-          <div className="text-[11px] uppercase tracking-widest text-text-dim font-medium flex items-center gap-1.5">
+        <div className="card-glow p-4 sm:p-5">
+          <div className="text-[10px] sm:text-[11px] uppercase tracking-widest text-text-dim font-medium flex items-center gap-1.5">
             <GitCompare className="w-3.5 h-3.5" /> {t.dashboard.shared}
           </div>
           <div className="metric-value text-magenta mt-2">{sharedPortfolios.length}</div>
         </div>
-        <div className="card-glow p-5">
-          <div className="text-[11px] uppercase tracking-widest text-text-dim font-medium flex items-center gap-1.5">
+        <div className="card-glow p-4 sm:p-5">
+          <div className="text-[10px] sm:text-[11px] uppercase tracking-widest text-text-dim font-medium flex items-center gap-1.5">
             <Zap className="w-3.5 h-3.5" /> {t.dashboard.best_sharpe}
           </div>
           <div className="metric-value text-positive mt-2">{bestSharpe ? fmtNum(bestSharpe.sharpe_ratio, 2) : "—"}</div>
           {bestSharpe && <div className="text-xs text-text-muted truncate mt-0.5">{bestSharpe.name}</div>}
         </div>
-        <div className="card-glow p-5">
-          <div className="text-[11px] uppercase tracking-widest text-text-dim font-medium flex items-center gap-1.5">
+        <div className="card-glow p-4 sm:p-5">
+          <div className="text-[10px] sm:text-[11px] uppercase tracking-widest text-text-dim font-medium flex items-center gap-1.5">
             <TrendingUp className="w-3.5 h-3.5" /> {t.dashboard.quota_today}
           </div>
           {user?.role === "admin" ? (

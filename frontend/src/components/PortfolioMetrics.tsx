@@ -6,6 +6,7 @@ import MetricCard from "./MetricCard";
 
 interface Props {
   data: {
+    cagr_annual?: number | null;
     expected_return_annual: number;
     volatility_annual: number;
     sharpe_ratio: number;
@@ -21,6 +22,9 @@ interface Props {
 export default function PortfolioMetrics({ data }: Props) {
   const t = useT();
   const expectedValue = data.initial_capital * (1 + data.expected_return_annual);
+  const cagr = data.cagr_annual ?? null;
+  const cagrValue = cagr !== null ? data.initial_capital * (1 + cagr) : null;
+  const drag = cagr !== null ? data.expected_return_annual - cagr : null;
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -32,6 +36,22 @@ export default function PortfolioMetrics({ data }: Props) {
         tone={data.expected_return_annual > 0 ? "positive" : "negative"}
         tooltip={t.metrics.expected_return_tooltip}
       />
+      {cagr !== null && (
+        <MetricCard
+          label="CAGR (geometric)"
+          value={fmtPct(cagr)}
+          hint={
+            drag !== null && Math.abs(drag) > 0.005
+              ? `variance drag ${drag >= 0 ? "+" : ""}${(drag * 100).toFixed(1)} pp · ${
+                  cagrValue !== null ? fmtUSD(cagrValue, 0) : ""
+                }`
+              : "realised geometric return"
+          }
+          icon={<TrendingUp className="w-4 h-4" />}
+          tone={cagr > 0 ? "positive" : "negative"}
+          tooltip="Compound annual growth rate from historical returns. For variance-heavy assets (VIX, crypto, levered ETFs) CAGR is materially below arithmetic μ — the gap is the variance drag."
+        />
+      )}
       <MetricCard
         label={t.metrics.volatility}
         value={fmtPct(data.volatility_annual)}

@@ -6,12 +6,12 @@ import { errorMessage } from "../api/client";
 import * as api from "../api/portfolios";
 import type { PortfolioOut } from "../api/portfolios";
 import AllocationTable from "../components/AllocationTable";
+import AssetHistoryModal from "../components/AssetHistoryModal";
 import CorrelationHeatmap from "../components/charts/CorrelationHeatmap";
 import DistributionChart from "../components/charts/DistributionChart";
 import EfficientFrontier from "../components/charts/EfficientFrontier";
 import MonteCarloFan from "../components/charts/MonteCarloFan";
 import WeightsBar from "../components/charts/WeightsBar";
-import WeightsPie from "../components/charts/WeightsPie";
 import PortfolioMetrics from "../components/PortfolioMetrics";
 import Section from "../components/Section";
 import { useT, tpl } from "../i18n";
@@ -26,6 +26,7 @@ export default function PortfolioView() {
   const [data, setData] = useState<PortfolioOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [historySymbol, setHistorySymbol] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -126,11 +127,13 @@ export default function PortfolioView() {
           ? tpl(t.portfolio_view.aa_subtitle_filtered, { visible: visible.length, hidden, capital: fmtUSD(data.initial_capital, 0) })
           : tpl(t.portfolio_view.aa_subtitle_full, { visible: visible.length, capital: fmtUSD(data.initial_capital, 0) });
         return (
-          <Section title={t.builder.asset_allocation} subtitle={subtitle}>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <WeightsPie weights={visible} />
-              <WeightsBar weights={visible} />
-            </div>
+          <Section
+            title={t.builder.asset_allocation}
+            subtitle={subtitle}
+            action={<span className="text-[11px] text-text-dim italic">{t.asset_modal.click_hint}</span>}
+          >
+            {/* Bar chart spans the whole section — the pie used to duplicate it. */}
+            <WeightsBar weights={visible} onBarClick={setHistorySymbol} />
             <div className="mt-6">
               <AllocationTable weights={visible} />
             </div>
@@ -235,6 +238,12 @@ export default function PortfolioView() {
           ))}
         </div>
       </Section>
+
+      <AssetHistoryModal
+        symbol={historySymbol}
+        years={data.history_years || 20}
+        onClose={() => setHistorySymbol(null)}
+      />
     </div>
   );
 }

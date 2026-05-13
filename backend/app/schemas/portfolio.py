@@ -16,8 +16,19 @@ class OptimizeRequest(BaseModel):
     long_only: bool = True
     sparsify: bool = True
     sparsify_threshold: float = Field(default=0.01, ge=0.0, le=0.5)
-    max_assets_in_universe: int = Field(default=300, ge=10, le=1000)
+    # Hard ceiling = 2000 to leave room for catalog growth; the live Libertex
+    # catalogue is ~1500. The frontend slider exposes up to 1500 + an "All"
+    # quick-button. Personal-mode `FEATURE_FLAGS.max_assets` clamps the
+    # effective cap further inside `build_portfolio`.
+    max_assets_in_universe: int = Field(default=500, ge=10, le=2000)
     categories: Optional[List[str]] = None
+    # Tickers the user wants pulled OUT of the optimisation universe (e.g.
+    # close-only instruments on the broker, or assets they personally don't
+    # want to hold). Matched case-insensitively against `Asset.symbol`. Empty
+    # list = no exclusions. Applied AFTER category filtering but BEFORE
+    # history / negative-mean filters, so it doesn't affect the rest of the
+    # universe's composition.
+    exclude_symbols: List[str] = Field(default_factory=list)
 
 
 class AssetWeight(BaseModel):
@@ -28,6 +39,10 @@ class AssetWeight(BaseModel):
     amount_usd: float
     expected_return_annual: float
     volatility_annual: float
+    # Geometric annual return (CAGR) — sanity-check alongside the arithmetic
+    # μ that the optimiser uses internally. For variance-heavy assets (VIX,
+    # crypto, levered ETFs) `cagr_annual` is much lower than `expected_return_annual`.
+    cagr_annual: Optional[float] = None
 
 
 class EfficientFrontierPoint(BaseModel):
@@ -52,6 +67,8 @@ class MonteCarloResult(BaseModel):
     months: List[int]
     median_path: List[float]
     p5_path: List[float]
+    p25_path: List[float] = []
+    p75_path: List[float] = []
     p95_path: List[float]
 
 
@@ -64,6 +81,11 @@ class OptimizeResponse(BaseModel):
 
     expected_return_annual: float
     volatility_annual: float
+    # Geometric mean (CAGR) of the portfolio over the joint historical
+    # window. The headline `expected_return_annual` is the arithmetic μ × 12
+    # used by the Markowitz model. `cagr_annual` is the realised buy-and-hold
+    # return; gap between the two equals the variance drag.
+    cagr_annual: float = 0.0
     sharpe_ratio: float
     sortino_ratio: float
     var_95_annual: float

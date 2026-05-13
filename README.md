@@ -2,16 +2,68 @@
 
 Markowitz mean-variance portfolio optimizer with a modern interactive web UI.
 
-Features:
-- 4 optimization objectives: Min Variance, Max Sharpe, Target Return, Target Risk
-- Long-only, no maximum-weight cap, automatic risk-free rate (10Y Treasury via yfinance)
-- Estimation: monthly returns, up to 20 years history (configurable), Ledoit-Wolf shrinkage cov matrix
-- Filters: drops assets with insufficient history (< 6 years default), drops assets with non-positive mean
-- 12-month forecast: analytical metrics + Monte Carlo (5,000 sims) + S&P 500 benchmark
-- Sparsification (1% threshold) with renormalization
-- Multi-user with admin approval, per-user daily/weekly quotas, quota request workflow
+## Deployment modes
+
+The same codebase ships as two products controlled by the
+`DEPLOYMENT_MODE` env var in `backend/.env`:
+
+| Mode             | `DEPLOYMENT_MODE` | Audience            | Features                                       |
+|------------------|-------------------|---------------------|-------------------------------------------------|
+| **personal**     | `personal`        | Project owner / SaaS | Everything ON, full asset catalogue            |
+| **libertex_lite**| `libertex_lite`   | B2B / partner gift   | Capped at 50 assets, no Monte Carlo, no Black-Litterman, no broker API, PDF-only export |
+
+Feature flags live in `backend/app/config.py:FEATURE_FLAGS`. The frontend
+calls `GET /api/config` on boot and hides locked controls automatically.
+To build a lite distribution, set `DEPLOYMENT_MODE=libertex_lite` in `.env`
+and rebuild the frontend.
+
+## Features (personal mode)
+
+- 4 optimisation objectives: Min Variance, Max Sharpe, Target Return, Target Risk
+- Long-only, no max-weight cap, automatic 10Y Treasury risk-free rate from yfinance
+- Estimation: **per-asset full-history μ** (each asset uses its own longest series)
+  and **common-window Σ** (Ledoit-Wolf shrinkage by default; sample and
+  EWMA also available). This avoids the standard "truncate to youngest
+  asset" mistake.
+- **Geometric mean (CAGR)** displayed alongside arithmetic μ — exposes the
+  variance drag of volatile assets like VIX, crypto, levered ETFs.
+- Filters: drops assets with `< 6` years of monthly history, with
+  non-positive arithmetic mean, or with implausible monthly spikes
+  (>300 % for stocks, >1500 % for crypto — catches bad yfinance ticks).
+- 12-month forecast: analytical metrics + Monte Carlo (5 000 sims) + S&P 500 benchmark
+- Sparsification (1 % threshold) with renormalisation
+- Multi-user with admin approval, per-user daily / weekly quotas, quota-request workflow
 - Portfolio sharing, comparison, PDF / Excel export
 - Dark neon UI, Plotly dashboards, responsive layout
+
+## Asset catalogue
+
+The seed catalogue is auto-generated from
+[libertex.org/cfd-specification](https://libertex.org/cfd-specification)
+by `backend/scrape_libertex.py` (Playwright + Edge, bypasses Cloudflare
+challenge). The scraper iterates **all six Libertex platforms** (Libertex,
+Libertex Portfolio, MT4-Instant, MT4-Market, MT5-Instant, MT5-Market) and
+unions their instruments. Current count: **1480 mapped** (out of 1531 scraped):
+
+| Category   | Count |
+|------------|------:|
+| Stocks     |  1245 |
+| Crypto     |   109 |
+| FX         |    50 |
+| ETFs       |    34 |
+| Commodities|    20 |
+| Indexes    |    19 |
+| Bonds      |     3 |
+| **Total**  | **1480** |
+
+To refresh from a fresh scrape:
+```bash
+cd backend
+.venv/Scripts/python.exe scrape_libertex.py          # writes data/libertex_raw.json
+.venv/Scripts/python.exe build_seed_from_scrape.py   # rebuilds app/services/libertex_seed.py
+.venv/Scripts/python.exe reseed_assets.py            # wipes Asset table, loads new seed
+.venv/Scripts/python.exe warmup_cache.py             # pre-fetches yfinance history → data/prices/*.parquet
+```
 
 ## Stack
 - **Backend:** Python 3.11 / FastAPI / SQLAlchemy / SQLite / cvxpy / scikit-learn / yfinance

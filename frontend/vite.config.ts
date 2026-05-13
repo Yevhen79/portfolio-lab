@@ -7,7 +7,7 @@ export default defineConfig({
     port: 5173,
     host: true,
     // Allow access from Cloudflare quick tunnels and any LAN host
-    allowedHosts: [".trycloudflare.com", ".loca.lt", ".ngrok.io", ".ngrok-free.app", "localhost"],
+    allowedHosts: [".trycloudflare.com", ".loca.lt", ".ngrok.io", ".ngrok-free.app", ".ngrok-free.dev", ".ngrok.app", ".ngrok.dev", "localhost"],
     proxy: {
       "/api": {
         target: "http://localhost:8000",

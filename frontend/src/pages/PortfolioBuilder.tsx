@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertCircle, Loader2, Play, Save, Target } from "lucide-react";
+import { AlertCircle, Ban, Loader2, Play, Plus, Save, Target, X } from "lucide-react";
 
 import { errorMessage } from "../api/client";
 import * as portfoliosApi from "../api/portfolios";
@@ -8,11 +8,11 @@ import type { OptimizeRequest, OptimizeResponse } from "../api/portfolios";
 import EfficientFrontier from "../components/charts/EfficientFrontier";
 import MonteCarloFan from "../components/charts/MonteCarloFan";
 import WeightsBar from "../components/charts/WeightsBar";
-import WeightsPie from "../components/charts/WeightsPie";
 import CorrelationHeatmap from "../components/charts/CorrelationHeatmap";
 import DistributionChart from "../components/charts/DistributionChart";
 import PortfolioMetrics from "../components/PortfolioMetrics";
 import AllocationTable from "../components/AllocationTable";
+import AssetHistoryModal from "../components/AssetHistoryModal";
 import HelpTip from "../components/HelpTip";
 import Section from "../components/Section";
 import { useT, tpl } from "../i18n";
@@ -31,11 +31,48 @@ const DEFAULT_REQ: OptimizeRequest = {
   long_only: true,
   sparsify: true,
   sparsify_threshold: 0.01,
-  max_assets_in_universe: 100,
+  // Personal-mode cap is 1000 (see FEATURE_FLAGS in backend/config.py). The
+  // previous default (100) was a leftover from early dev and silently cut the
+  // optimiser off from ~1300 mapped instruments. 500 strikes a balance: wide
+  // enough to surface genuinely diverse mixes, narrow enough that the first
+  // cold-cache run still fits inside the 60 s yfinance window.
+  max_assets_in_universe: 500,
+  categories: ["stock", "index", "commodity", "crypto", "fx", "etf"],
+  // The slider falls back to 0.20 when target_risk is null, so we set
+  // the same default here — that way the slider position always matches
+  // the actual state instead of "looking like 20% but actually null".
+  target_risk: 0.20,
+  target_return: 0.15,
+  exclude_symbols: [],
+};
+
+const ALL_CATEGORIES = ["stock", "index", "commodity", "crypto", "fx", "etf"] as const;
+
+/** localStorage key for the user's "permanent" exclusion list. Survives full
+ *  reloads and re-logins on the same device. Stored as a JSON array of
+ *  uppercase ticker strings; the builder hydrates `req.exclude_symbols` from
+ *  it on mount and writes back on every change. The new-asset input adds to
+ *  this; the chip × removes from it; ditto the row × in the result table. */
+const EXCLUDE_LS_KEY = "pl_exclude_symbols_v1";
+const loadStoredExclusions = (): string[] => {
+  try {
+    const raw = localStorage.getItem(EXCLUDE_LS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter((s) => typeof s === "string") : [];
+  } catch {
+    return [];
+  }
 };
 
 export default function PortfolioBuilder() {
-  const [req, setReq] = useState<OptimizeRequest>(DEFAULT_REQ);
+  const [req, setReq] = useState<OptimizeRequest>(() => ({
+    ...DEFAULT_REQ,
+    // Hydrate from localStorage on first mount so the user's permanent
+    // exclusion preferences (e.g. "always skip USDTRY/EURTRY") survive
+    // browser refresh.
+    exclude_symbols: loadStoredExclusions(),
+  }));
   const [result, setResult] = useState<OptimizeResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +80,13 @@ export default function PortfolioBuilder() {
   const [saveNotes, setSaveNotes] = useState("");
   const [savePublic, setSavePublic] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Symbol → human label cache for exclusion chips. We keep a separate map
+  // (not just `req.exclude_symbols`) so a chip can show "Texas Pacific Land"
+  // even though the asset has already left `result.weights` after the rerun.
+  const [excludedLabels, setExcludedLabels] = useState<Record<string, string>>({});
+  // Currently-opened price-history modal symbol (null = closed). Clicking a
+  // bar in the WeightsBar sets this; the modal closes via Esc / backdrop / X.
+  const [historySymbol, setHistorySymbol] = useState<string | null>(null);
   const { user, refresh } = useAuth();
   const t = useT();
   const nav = useNavigate();
@@ -51,10 +95,14 @@ export default function PortfolioBuilder() {
     setReq((r) => ({ ...r, [k]: v }));
   }
 
-  async function runOptimize() {
+  // The `override` argument lets us re-run with a freshly-computed exclusion
+  // list without waiting for React's state batch to flush. `setReq` + reading
+  // `req` in the same tick would still hit the stale value.
+  async function runOptimize(override?: Partial<OptimizeRequest>) {
+    const payload = override ? { ...req, ...override } : req;
     setBusy(true); setError(null);
     try {
-      const r = await portfoliosApi.optimize(req);
+      const r = await portfoliosApi.optimize(payload);
       setResult(r);
       if (!saveName) {
         const map: Record<string, string> = {
@@ -63,7 +111,7 @@ export default function PortfolioBuilder() {
           target_return: t.builder.strategy_target_return,
           target_risk: t.builder.strategy_target_risk,
         };
-        setSaveName(`${map[req.portfolio_type]} — ${new Date().toLocaleDateString()}`);
+        setSaveName(`${map[payload.portfolio_type]} — ${new Date().toLocaleDateString()}`);
       }
     } catch (e) {
       setError(errorMessage(e, t.builder.optimization_failed));
@@ -71,6 +119,114 @@ export default function PortfolioBuilder() {
     } finally {
       setBusy(false);
     }
+  }
+
+  /** Add a symbol to `exclude_symbols` (if not already there) and trigger an
+   *  immediate re-optimization. The chip label is captured from the current
+   *  result so the panel keeps showing the human name after rerun. */
+  function excludeAndRerun(symbol: string) {
+    const sym = symbol.trim().toUpperCase();
+    if (!sym) return;
+    const cur = req.exclude_symbols ?? [];
+    if (cur.includes(sym)) return;
+    // Cache the asset's display name from the current result (if any) so the
+    // chip can render "AAPL — Apple Inc." instead of just the ticker.
+    const w = result?.weights?.find((x) => (x.symbol || "").toUpperCase() === sym);
+    if (w && w.name && w.name !== w.symbol) {
+      setExcludedLabels((m) => ({ ...m, [sym]: w.name }));
+    }
+    const next = [...cur, sym];
+    setReq((r) => ({ ...r, exclude_symbols: next }));
+    void runOptimize({ exclude_symbols: next });
+  }
+
+  /** Restore a previously-excluded symbol and rerun. */
+  function restoreAndRerun(symbol: string) {
+    const sym = symbol.trim().toUpperCase();
+    const cur = req.exclude_symbols ?? [];
+    if (!cur.includes(sym)) return;
+    const next = cur.filter((s) => s !== sym);
+    setReq((r) => ({ ...r, exclude_symbols: next }));
+    setExcludedLabels((m) => {
+      const { [sym]: _drop, ...rest } = m;
+      return rest;
+    });
+    void runOptimize({ exclude_symbols: next });
+  }
+
+  /** Wipe all exclusions and rerun (if there's a current result). */
+  function clearExclusionsAndRerun() {
+    const cur = req.exclude_symbols ?? [];
+    if (cur.length === 0) return;
+    setReq((r) => ({ ...r, exclude_symbols: [] }));
+    setExcludedLabels({});
+    if (result) void runOptimize({ exclude_symbols: [] });
+  }
+
+  /** Staging-only add: pushes a ticker into `exclude_symbols` without
+   *  triggering a re-optimisation. Used by the sidebar input so the user can
+   *  set up "always skip these" exclusions before the first build. If a
+   *  portfolio is already on screen we ALSO rerun — same UX as `excludeAndRerun`.
+   *
+   *  IMPORTANT: when called repeatedly in the same tick (e.g. for each token
+   *  in a comma-separated input), the React state from the closure is stale.
+   *  We therefore use the functional setter — each call sees the latest list. */
+  function stageExclude(symbolRaw: string) {
+    const sym = (symbolRaw || "").trim().toUpperCase();
+    if (!sym) return;
+    const w = result?.weights?.find((x) => (x.symbol || "").toUpperCase() === sym);
+    if (w && w.name && w.name !== w.symbol) {
+      setExcludedLabels((m) => (m[sym] ? m : { ...m, [sym]: w.name }));
+    }
+    let nextList: string[] | null = null;
+    setReq((r) => {
+      const cur = r.exclude_symbols ?? [];
+      if (cur.includes(sym)) {
+        nextList = cur;
+        return r;
+      }
+      nextList = [...cur, sym];
+      return { ...r, exclude_symbols: nextList };
+    });
+    // Only auto-rerun if a portfolio is already showing. Pre-first-run the
+    // user explicitly hits "Create" themselves.
+    if (result && nextList) void runOptimize({ exclude_symbols: nextList });
+  }
+
+  /** Remove a staged exclusion without rerunning (sidebar chip ×). */
+  function unstageExclude(symbolRaw: string) {
+    const sym = (symbolRaw || "").trim().toUpperCase();
+    const cur = req.exclude_symbols ?? [];
+    if (!cur.includes(sym)) return;
+    const next = cur.filter((s) => s !== sym);
+    setReq((r) => ({ ...r, exclude_symbols: next }));
+    setExcludedLabels((m) => {
+      const { [sym]: _drop, ...rest } = m;
+      return rest;
+    });
+    if (result) void runOptimize({ exclude_symbols: next });
+  }
+
+  // Persist exclusion list to localStorage on every change so user
+  // preferences survive page reloads / re-logins.
+  useEffect(() => {
+    try {
+      localStorage.setItem(EXCLUDE_LS_KEY, JSON.stringify(req.exclude_symbols ?? []));
+    } catch {
+      /* quota or private-mode failure — fine to ignore, in-memory state still works */
+    }
+  }, [req.exclude_symbols]);
+
+  // Controlled value of the "add exclusion" input.
+  const [excludeInput, setExcludeInput] = useState("");
+  const excludeInputRef = useRef<HTMLInputElement | null>(null);
+  function submitExcludeInput() {
+    const v = excludeInput.trim();
+    if (!v) return;
+    // Allow comma-separated input: "USDTRY, EURTRY, GBPTRY"
+    v.split(/[,\s]+/).filter(Boolean).forEach(stageExclude);
+    setExcludeInput("");
+    excludeInputRef.current?.focus();
   }
 
   // Initial capital change shouldn't trigger re-optimization (only re-display)
@@ -138,14 +294,14 @@ export default function PortfolioBuilder() {
   const quotaInfo = user?.quota;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-2 md:gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight neon-text inline-block">{t.builder.page_title}</h1>
-          <p className="text-text-muted mt-1">{t.builder.page_subtitle}</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight neon-text inline-block">{t.builder.page_title}</h1>
+          <p className="text-xs sm:text-base text-text-muted mt-1">{t.builder.page_subtitle}</p>
         </div>
         {quotaInfo && user?.role !== "admin" && (
-          <div className="text-sm text-text-muted">
+          <div className="text-xs sm:text-sm text-text-muted">
             {t.builder.today_used}: <span className="text-cyan font-mono font-semibold">
               {quotaInfo.today_used}{quotaInfo.today_limit !== null ? ` / ${(quotaInfo.today_limit + (quotaInfo.bonus_today || 0))}` : ""}
             </span>
@@ -153,7 +309,7 @@ export default function PortfolioBuilder() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
         {/* LEFT: form */}
         <div className="lg:col-span-4 space-y-4">
           <Section
@@ -309,6 +465,134 @@ export default function PortfolioBuilder() {
           </Section>
 
           <Section
+            title={t.builder.categories_title}
+            subtitle={t.builder.categories_subtitle}
+            help={
+              <HelpTip title={t.builder.categories_help_title} width={340}>
+                {t.builder.categories_help_body}
+              </HelpTip>
+            }
+            action={
+              <div className="flex gap-1">
+                <button
+                  onClick={() => update("categories", [...ALL_CATEGORIES])}
+                  className="text-[10px] px-2 py-0.5 rounded-md border border-border text-text-muted hover:text-cyan hover:border-cyan transition-colors"
+                >
+                  {t.builder.categories_select_all}
+                </button>
+                <button
+                  onClick={() => update("categories", [])}
+                  className="text-[10px] px-2 py-0.5 rounded-md border border-border text-text-muted hover:text-red hover:border-red transition-colors"
+                >
+                  {t.builder.categories_clear_all}
+                </button>
+              </div>
+            }
+          >
+            <div className="grid grid-cols-3 gap-2">
+              {ALL_CATEGORIES.map((cat) => {
+                const selected = (req.categories ?? []).includes(cat);
+                const labelKey = `cat_${cat}` as
+                  | "cat_stock" | "cat_index" | "cat_commodity"
+                  | "cat_crypto" | "cat_fx" | "cat_etf";
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => {
+                      setReq((r) => {
+                        const cur = r.categories ?? [...ALL_CATEGORIES];
+                        const next = cur.includes(cat)
+                          ? cur.filter((c) => c !== cat)
+                          : [...cur, cat];
+                        return { ...r, categories: next };
+                      });
+                    }}
+                    className={`px-2 py-2 rounded-lg text-xs font-medium transition-all border capitalize ${
+                      selected
+                        ? "border-cyan bg-cyan/10 text-cyan shadow-glow"
+                        : "border-border text-text-dim hover:border-border-accent"
+                    }`}
+                  >
+                    {t.builder[labelKey]}
+                  </button>
+                );
+              })}
+            </div>
+          </Section>
+
+          <Section
+            title={t.builder.exclude_section_title}
+            subtitle={
+              (req.exclude_symbols?.length ?? 0) === 0
+                ? t.builder.exclude_section_subtitle_empty
+                : tpl(t.builder.exclude_section_subtitle, { n: req.exclude_symbols!.length })
+            }
+            help={
+              <HelpTip title={t.builder.exclude_section_help_title} width={360}>
+                {t.builder.exclude_section_help_body}
+              </HelpTip>
+            }
+            action={
+              (req.exclude_symbols?.length ?? 0) > 0 ? (
+                <button
+                  onClick={clearExclusionsAndRerun}
+                  className="text-[10px] px-2 py-0.5 rounded-md border border-border text-text-muted hover:text-red hover:border-red transition-colors"
+                >
+                  {t.builder.excluded_clear_all}
+                </button>
+              ) : null
+            }
+          >
+            <div className="flex gap-2">
+              <input
+                ref={excludeInputRef}
+                type="text"
+                value={excludeInput}
+                onChange={(e) => setExcludeInput(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    submitExcludeInput();
+                  }
+                }}
+                placeholder={t.builder.exclude_input_placeholder}
+                spellCheck={false}
+                autoCapitalize="characters"
+                className="input font-mono flex-1"
+              />
+              <button
+                type="button"
+                onClick={submitExcludeInput}
+                disabled={!excludeInput.trim()}
+                aria-label={t.builder.exclude_add_button}
+                className="px-3 rounded-xl bg-cyan/10 border border-cyan/40 text-cyan hover:bg-cyan/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+            {(req.exclude_symbols?.length ?? 0) > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {req.exclude_symbols!.map((sym) => {
+                  const label = excludedLabels[sym];
+                  return (
+                    <button
+                      key={sym}
+                      type="button"
+                      onClick={() => unstageExclude(sym)}
+                      title={label ? `${sym} · ${label}` : sym}
+                      className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-bg-elevated border border-border hover:border-red hover:bg-red/10 text-xs font-mono transition-colors"
+                    >
+                      <Ban className="w-3 h-3 text-red" />
+                      <span className="font-semibold text-cyan">{sym}</span>
+                      <X className="w-3 h-3 text-text-dim ml-0.5" />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </Section>
+
+          <Section
             title={t.builder.advanced_title}
             subtitle={t.builder.advanced_subtitle}
             help={
@@ -332,6 +616,39 @@ export default function PortfolioBuilder() {
                   value={req.min_history_years}
                   onChange={(e) => update("min_history_years", Number(e.target.value))}
                   className="w-full accent-cyan" />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs uppercase tracking-wide text-text-muted inline-flex items-center">
+                    {t.builder.universe_size_label}
+                    <HelpTip title={t.builder.universe_size_help_title} width={400}>
+                      {t.builder.universe_size_help_body}
+                    </HelpTip>
+                  </label>
+                  <span className="font-mono text-cyan">{req.max_assets_in_universe}</span>
+                </div>
+                <input type="range" min={50} max={1500} step={50}
+                  value={Math.min(req.max_assets_in_universe, 1500)}
+                  onChange={(e) => update("max_assets_in_universe", Number(e.target.value))}
+                  className="w-full accent-cyan" />
+                <div className="flex justify-between text-[11px] text-text-muted mt-1">
+                  <span>50</span><span>500</span><span>1500</span>
+                </div>
+                {/* Snap to the entire catalog. Bypasses the μ/σ ranking step
+                    so every yfinance-validated, history-passing asset reaches
+                    the optimiser. Useful when you don't trust the Sharpe-rank
+                    cut to keep the assets you care about. */}
+                <button
+                  type="button"
+                  onClick={() => update("max_assets_in_universe", 1500)}
+                  className={`mt-2 text-[11px] px-2 py-1 rounded-md border transition-colors ${
+                    req.max_assets_in_universe >= 1500
+                      ? "border-cyan bg-cyan/10 text-cyan"
+                      : "border-border text-text-muted hover:border-cyan hover:text-cyan"
+                  }`}
+                >
+                  {t.builder.universe_size_all}
+                </button>
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1.5">
@@ -395,11 +712,11 @@ export default function PortfolioBuilder() {
           <button
             onClick={() => void runOptimize()}
             disabled={busy}
-            className="w-full px-6 py-4 rounded-2xl font-semibold text-bg
+            className="w-full px-4 sm:px-6 py-3 sm:py-4 rounded-2xl font-semibold text-bg
               bg-gradient-to-r from-cyan to-magenta
               hover:opacity-90 transition-opacity
               shadow-glow disabled:opacity-50 disabled:cursor-not-allowed
-              inline-flex items-center justify-center gap-3 text-lg sticky bottom-4 z-10"
+              inline-flex items-center justify-center gap-2 sm:gap-3 text-base sm:text-lg sticky bottom-2 sm:bottom-4 z-10"
           >
             {busy ? (
               <>
@@ -489,17 +806,65 @@ export default function PortfolioBuilder() {
                   ? tpl(t.builder.aa_subtitle_filtered, { visible: visible.length, hidden })
                   : tpl(t.builder.aa_subtitle_full, { visible: visible.length, universe: displayResult.universe_size });
                 return (
-                  <Section title={t.builder.asset_allocation} subtitle={subtitle}>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <WeightsPie weights={visible} />
-                      <WeightsBar weights={visible} />
-                    </div>
+                  <Section
+                    title={t.builder.asset_allocation}
+                    subtitle={subtitle}
+                    action={
+                      <span className="text-[11px] text-text-dim italic">{t.asset_modal.click_hint}</span>
+                    }
+                  >
+                    {/* Pie chart used to live next to this bar — it conveyed
+                        the same information (weight per asset) and just
+                        halved the available width. The bar gets the full
+                        section now so company names breathe. */}
+                    <WeightsBar weights={visible} onBarClick={setHistorySymbol} />
                     <div className="mt-6">
-                      <AllocationTable weights={visible} />
+                      <AllocationTable weights={visible} onExclude={excludeAndRerun} />
                     </div>
                   </Section>
                 );
               })()}
+
+              {(req.exclude_symbols?.length ?? 0) > 0 && (
+                <Section
+                  title={t.builder.excluded_title}
+                  subtitle={
+                    (req.exclude_symbols!.length === 1
+                      ? tpl(t.builder.excluded_subtitle_one, { n: 1 })
+                      : tpl(t.builder.excluded_subtitle_many, { n: req.exclude_symbols!.length }))
+                  }
+                  action={
+                    <button
+                      onClick={clearExclusionsAndRerun}
+                      disabled={busy}
+                      className="text-[10px] px-2 py-0.5 rounded-md border border-border text-text-muted hover:text-cyan hover:border-cyan transition-colors disabled:opacity-50"
+                    >
+                      {t.builder.excluded_clear_all}
+                    </button>
+                  }
+                >
+                  <div className="flex flex-wrap gap-2">
+                    {req.exclude_symbols!.map((sym) => {
+                      const label = excludedLabels[sym];
+                      return (
+                        <button
+                          key={sym}
+                          type="button"
+                          onClick={() => restoreAndRerun(sym)}
+                          disabled={busy}
+                          title={t.builder.exclude_button_title}
+                          className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-bg-elevated border border-border hover:border-red hover:bg-red/10 text-sm transition-colors disabled:opacity-50"
+                        >
+                          <Ban className="w-3.5 h-3.5 text-red" />
+                          <span className="font-mono font-semibold text-cyan">{sym}</span>
+                          {label && <span className="text-text-muted text-xs">· {label}</span>}
+                          <X className="w-3.5 h-3.5 text-text-dim group-hover:text-red ml-1" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
 
               <Section
                 title={t.builder.efficient_frontier_title}
@@ -607,6 +972,15 @@ export default function PortfolioBuilder() {
           )}
         </div>
       </div>
+
+      {/* Price-history modal — mounted at root so it overlays everything.
+          `historySymbol === null` returns null inside the component, so the
+          listener / fetch are gated by mount. */}
+      <AssetHistoryModal
+        symbol={historySymbol}
+        years={req.history_years}
+        onClose={() => setHistorySymbol(null)}
+      />
     </div>
   );
 }

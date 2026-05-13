@@ -36,13 +36,22 @@ if not "%ONLY%"=="backend" (
     start "Portfolio Lab — Frontend" cmd /k "cd /d %~dp0frontend && npm run dev"
 )
 
-REM ---------- Public Tunnel (localtunnel) ----------
-REM We use localtunnel because Cloudflare's quick-tunnel API is unreachable
-REM from some Russian ISPs. localtunnel works through different infra (loca.lt).
+REM ---------- Public Tunnel (ngrok) ----------
+REM Uses ngrok with a reserved subdomain so the URL is stable across restarts.
+REM Make sure `ngrok config add-authtoken <YOUR_TOKEN>` was run once on this machine.
+REM Cloudflare quick tunnel is intentionally NOT used because some ISPs block
+REM api.trycloudflare.com.
 if "%TUNNEL%"=="1" if not "%ONLY%"=="backend" if not "%ONLY%"=="frontend" (
-    echo Starting localtunnel (gives you a public *.loca.lt URL)...
-    timeout /t 4 /nobreak >nul
-    start "Portfolio Lab — Public Tunnel" cmd /k "npx -y localtunnel --port 5173"
+    where ngrok >nul 2>&1
+    if errorlevel 1 (
+        echo NOTE: ngrok not found on PATH. Skipping public tunnel.
+        echo Install via:  winget install Ngrok.Ngrok
+        echo Then: ngrok config add-authtoken YOUR_TOKEN
+    ) else (
+        echo Starting ngrok tunnel on portfolio-lab-yevhen.ngrok-free.dev ...
+        timeout /t 4 /nobreak >nul
+        start "Portfolio Lab — Public Tunnel" cmd /k "ngrok http 5173 --domain=portfolio-lab-yevhen.ngrok-free.dev"
+    )
 )
 
 echo.
@@ -58,10 +67,8 @@ echo  Login (admin):
 echo    email:    evgenij.shakotko@gmail.com
 echo    password: 12345
 echo.
-echo  Public URL appears in the "Public Tunnel" window
-echo  after a few seconds. Look for "your url is:" line.
-echo  First-time visitors will see a "tunnel password" gate;
-echo  the password shown there is the public IP from the gate page itself.
+echo  Public URL: https://portfolio-lab-yevhen.ngrok-free.dev
+echo  (the "Public Tunnel" window shows the connected status)
 echo ============================================================
 echo.
 endlocal

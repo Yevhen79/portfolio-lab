@@ -33,23 +33,23 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg bg-grid p-6">
-      <div className="card-glow p-10 w-full max-w-md animate-slide-up">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-neon-gradient flex items-center justify-center shadow-glow">
-              <Sparkles className="w-6 h-6 text-bg" />
+    <div className="min-h-screen flex items-center justify-center bg-bg bg-grid p-4 sm:p-6">
+      <div className="card-glow p-6 sm:p-10 w-full max-w-md animate-slide-up">
+        <div className="flex items-center justify-between mb-6 sm:mb-8 gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-neon-gradient flex items-center justify-center shadow-glow shrink-0">
+              <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-bg" />
             </div>
-            <div>
-              <div className="font-bold text-2xl neon-text leading-tight">{t.app.name}</div>
-              <div className="text-xs uppercase tracking-widest text-text-dim">{t.app.tagline}</div>
+            <div className="min-w-0">
+              <div className="font-bold text-xl sm:text-2xl neon-text leading-tight truncate">{t.app.name}</div>
+              <div className="text-[10px] sm:text-xs uppercase tracking-widest text-text-dim truncate">{t.app.tagline}</div>
             </div>
           </div>
           <LangSwitcher />
         </div>
 
-        <h1 className="text-2xl font-semibold mb-1">{t.auth.login_title}</h1>
-        <p className="text-text-muted text-sm mb-8">{t.auth.login_subtitle}</p>
+        <h1 className="text-xl sm:text-2xl font-semibold mb-1">{t.auth.login_title}</h1>
+        <p className="text-text-muted text-xs sm:text-sm mb-6 sm:mb-8">{t.auth.login_subtitle}</p>
 
         <form onSubmit={submit} className="space-y-4">
           <div>

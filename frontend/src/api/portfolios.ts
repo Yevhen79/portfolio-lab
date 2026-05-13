@@ -8,6 +8,9 @@ export interface AssetWeight {
   amount_usd: number;
   expected_return_annual: number;
   volatility_annual: number;
+  /** Geometric annual return (CAGR) over the asset's own full history.
+   *  Null if not provided by backend (e.g. libertex_lite mode). */
+  cagr_annual?: number | null;
 }
 
 export interface MonteCarloResult {
@@ -42,6 +45,9 @@ export interface OptimizeRequest {
   sparsify_threshold: number;
   max_assets_in_universe: number;
   categories?: string[] | null;
+  /** Tickers to PULL OUT of the universe before optimisation. Matched
+   *  case-insensitively against `Asset.symbol`. Backend default is []. */
+  exclude_symbols?: string[];
 }
 
 export interface OptimizeResponse {
@@ -51,6 +57,9 @@ export interface OptimizeResponse {
   universe_size: number;
   sparsified: boolean;
   expected_return_annual: number;
+  /** Geometric mean (CAGR) of the realised portfolio. Compare with arithmetic
+   *  `expected_return_annual` to see variance drag — large gap = volatile mix. */
+  cagr_annual: number;
   volatility_annual: number;
   sharpe_ratio: number;
   sortino_ratio: number;

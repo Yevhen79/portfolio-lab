@@ -90,3 +90,14 @@ body {
 .text-negative {
   color: #FF3B5C;
 }
+
+/* When a Plotly chart is wired with a bar-click handler we tag it
+   `.plotly-clickable`. Plotly's own internals stick `cursor: crosshair`
+   inline on its drag layer (`.nsewdrag`), which beats anything we set on
+   the host div. The selectors below win on specificity + `!important` so
+   the user gets a "this is interactive" pointer over the bars. */
+.plotly-clickable .nsewdrag,
+.plotly-clickable .point path,
+.plotly-clickable .barlayer path {
+  cursor: pointer !important;
+}

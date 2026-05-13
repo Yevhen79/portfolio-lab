@@ -3,30 +3,40 @@ import Plot from "react-plotly.js";
 import { NEON, PLOT_CONFIG, PLOT_LAYOUT_DEFAULTS } from "./plotly_theme";
 
 interface Props {
-  months: number[];
-  median: number[];
-  p5: number[];
-  p25: number[];
-  p75: number[];
-  p95: number[];
-  paths_sample?: number[][];
+  months?: number[] | null;
+  median?: number[] | null;
+  p5?: number[] | null;
+  p25?: number[] | null;
+  p75?: number[] | null;
+  p95?: number[] | null;
+  paths_sample?: number[][] | null;
   initial: number;
   benchmarkValue?: number | null;
   height?: number;
 }
 
-export default function MonteCarloFan({
-  months,
-  median,
-  p5,
-  p25,
-  p75,
-  p95,
-  paths_sample,
-  initial,
-  benchmarkValue,
-  height = 460,
-}: Props) {
+/** Defensive: any prop that the backend (or an older saved portfolio) may
+ *  forget to send becomes an empty array instead of crashing the chart. */
+const arr = (x: number[] | null | undefined): number[] => (Array.isArray(x) ? x : []);
+
+export default function MonteCarloFan(props: Props) {
+  const months = arr(props.months);
+  const median = arr(props.median);
+  const p5 = arr(props.p5);
+  const p25 = arr(props.p25);
+  const p75 = arr(props.p75);
+  const p95 = arr(props.p95);
+  const paths_sample = Array.isArray(props.paths_sample) ? props.paths_sample : [];
+  const { initial, benchmarkValue, height = 460 } = props;
+
+  if (months.length === 0) {
+    return (
+      <div className="text-text-muted text-center py-12 text-sm">
+        No Monte Carlo data available for this portfolio.
+      </div>
+    );
+  }
+
   const data: any[] = [];
 
   // p5-p95 outer band
