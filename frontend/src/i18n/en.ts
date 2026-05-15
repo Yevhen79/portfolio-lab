@@ -396,6 +396,17 @@ export const en = {
     col_cagr_annual: "CAGR",
     col_sigma_annual: "σ annual",
   },
+  concentration: {
+    title: "Highly concentrated portfolio",
+    body_one: "Math is correct, but your settings ended up putting {top} of capital into a single asset. This is the optimiser's max-Sharpe / min-variance result given your constraints — not what most people want from a \"portfolio\".",
+    body_many: "Math is correct, but your settings ended up putting capital into only {n} significant positions (top one at {top}). This is the optimiser's result given your constraints — usually too concentrated.",
+    tips_label: "How to get diversification",
+    tip_lower_sparsify: "Lower the Sparsify threshold (currently {current}) — it cuts everything below that and aggressive values collapse the support.",
+    tip_enable_cap: "Turn the \"Max weight per asset\" cap back on (default 35%) — it forces at least 3 non-zero positions.",
+    tip_tighten_cap: "Tighten the \"Max weight per asset\" cap (currently {current}) to 25–35%.",
+    tip_lower_history: "Lower the \"Min history\" filter (currently {current} years) — fewer required years admits more candidates.",
+    tip_broaden_categories: "Tick more asset categories (Crypto, ETF, FX) so the optimiser has a richer pool to combine.",
+  },
   build_errors: {
     tips_title: "What to try",
     details_label: "Technical details",

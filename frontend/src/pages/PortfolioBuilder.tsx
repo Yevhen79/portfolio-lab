@@ -14,6 +14,7 @@ import PortfolioMetrics from "../components/PortfolioMetrics";
 import AllocationTable from "../components/AllocationTable";
 import AssetHistoryModal from "../components/AssetHistoryModal";
 import BuildErrorCard from "../components/BuildErrorCard";
+import ConcentrationWarning from "../components/ConcentrationWarning";
 import HelpTip from "../components/HelpTip";
 import OptimizeProgress from "../components/OptimizeProgress";
 import Section from "../components/Section";
@@ -860,6 +861,12 @@ export default function PortfolioBuilder() {
                   previous result stays on screen below so the user can
                   compare before/after. */}
               {busy && <OptimizeProgress busy={busy} compact />}
+              <ConcentrationWarning
+                result={displayResult}
+                maxWeightPerAsset={req.max_weight_per_asset}
+                sparsifyThreshold={req.sparsify_threshold}
+                minHistoryYears={req.min_history_years}
+              />
               <div className="card-glow p-6">
                 <PortfolioMetrics data={displayResult} />
               </div>
