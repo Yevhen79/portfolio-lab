@@ -54,14 +54,53 @@ def assemble_returns(
     is_crypto_map: Dict[str, bool] = {}
     asset_by_yf: Dict[str, Asset] = {}
 
+    structural_drops: list[str] = []
     for a in assets:
         interval = "1wk" if a.is_crypto else "1mo"
         df = dl.fetch_yfinance(a.yf_symbol, interval=interval, years=history_years)
         if df is None or df.empty:
             continue
+
+        # Structural-breakage filter. Drops assets that suffered a permanent
+        # impairment (regulatory destruction, fraud, post-bubble crypto, etc.)
+        # and never recovered. The optimiser is otherwise math-blind to these:
+        # if the pre-crash boom was strong enough, mean and Sharpe still look
+        # OK over the full window, but the company / token is structurally
+        # broken and no rational investor would buy it today.
+        #
+        # Heuristic: currently trading below 25 % of all-time high, AND that
+        # high was set more than 24 months ago. A 24-month gap is enough to
+        # rule out "ordinary" drawdowns (the 2020 COVID dip recovered in
+        # months) and isolate genuinely-broken names like TAL (Chinese
+        # ed-tech post-July-2021, –95 % in two weeks), LUNA, FTT, Wirecard,
+        # etc.
+        try:
+            prices = df["close"].dropna()
+            if len(prices) >= 24:
+                max_p = float(prices.max())
+                last_p = float(prices.iloc[-1])
+                if max_p > 0 and last_p / max_p < 0.25:
+                    max_age_days = (prices.index[-1] - prices.idxmax()).days
+                    if max_age_days > 24 * 30:
+                        structural_drops.append(
+                            f"{a.symbol} ({last_p / max_p * 100:.0f}% of high, "
+                            f"max {max_age_days // 30}mo ago)"
+                        )
+                        continue
+        except Exception:
+            # Defensive: a malformed price frame shouldn't kill the run.
+            pass
+
         prices_by_symbol[a.yf_symbol] = df
         is_crypto_map[a.yf_symbol] = a.is_crypto
         asset_by_yf[a.yf_symbol] = a
+
+    if structural_drops:
+        logger.info(
+            "Structural-breakage filter dropped %d assets: %s",
+            len(structural_drops),
+            ", ".join(structural_drops[:10]) + ("..." if len(structural_drops) > 10 else ""),
+        )
 
     if not prices_by_symbol:
         return pd.DataFrame(), []

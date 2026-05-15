@@ -175,6 +175,9 @@ export const en = {
     aa_subtitle_filtered:
       "{visible} assets shown — {hidden} more had weight < 1% and were merged into shown holdings",
     aa_subtitle_full: "{visible} assets selected from a universe of {universe}",
+    aa_help_title: "Asset allocation",
+    aa_help_body:
+      "How the optimiser split your capital across the surviving assets, sorted by weight. The bar chart shows each asset's percentage; the table adds USD amount, arithmetic expected return (μ × 12), geometric CAGR, and annual volatility (σ). Click any bar to see the asset's full price history. The × icon at the end of each row drops the asset from the universe and re-runs.",
     exclude_button_title: "Exclude from the universe and re-optimize",
     excluded_title: "Excluded from universe",
     excluded_subtitle_one: "{n} asset excluded — click a chip to restore",
@@ -191,10 +194,20 @@ export const en = {
     exclude_add_button: "Add ticker to exclusions",
     efficient_frontier_title: "Efficient Frontier",
     efficient_frontier_subtitle: "Markowitz bullet — your portfolio is the star.",
+    efficient_frontier_help_title: "Efficient frontier (Markowitz bullet)",
+    efficient_frontier_help_body:
+      "Every point on the cyan curve is a portfolio with weights summing to 100% that achieves the LOWEST possible volatility for its expected return — or equivalently the HIGHEST return for its volatility. Below the curve = sub-optimal mixes (same risk for less return). Above the curve = impossible given the asset menu. Your portfolio is the star. The dashed line is the Capital Market Line — combinations of the risk-free asset and the tangent (max-Sharpe) portfolio. Any point on the CML strictly dominates the frontier alone in risk-adjusted terms.",
     long_only_label: "Long-only",
     forecast_title: "12-Month Forecast — Monte Carlo",
     forecast_subtitle:
       "{n} simulations · 12 monthly steps · {capital} → {value}",
+    forecast_help_title: "Monte-Carlo forecast",
+    forecast_help_body:
+      "We sample {n}+ random 12-month paths for your portfolio using the estimated μ and Σ. The fan shows the spread: the dark inner band is the 25th–75th percentile (50% of outcomes), the light outer band 5th–95th (90% of outcomes), and the cyan line is the median path. The dashed amber line is the S&P 500 over the same horizon for reference. Below the chart, five percentile cards give you the dollar value at each cut-off: 5%/25%/50%/75%/95% of simulations ended at or below that number.",
+    distribution_title: "Distribution of final outcomes",
+    distribution_help_title: "Final-value histogram",
+    distribution_help_body:
+      "Frequency distribution of the FINAL portfolio value after 12 months across all 5 000 Monte-Carlo simulations. The yellow dashed line marks your starting capital — anything to the right ended in profit, anything to the left in loss. WIDTH = uncertainty (wider = more variable outcomes). SHAPE: a thick right tail = upside potential; a thick left tail = real downside risk. Looking at peak location vs Initial gives a quick read on whether the expected case is gains or losses.",
     pct_worst: "Worst 5%",
     pct_25th: "25th pct",
     pct_median: "Median",
@@ -202,14 +215,23 @@ export const en = {
     pct_best: "Best 5%",
     benchmark_title: "Benchmark Comparison",
     benchmark_subtitle: "vs S&P 500 (^GSPC)",
+    benchmark_help_title: "Benchmark comparison (S&P 500)",
+    benchmark_help_body:
+      "How your optimised portfolio stacks up against a passive S&P 500 buy-and-hold over the same window. Expected return + volatility computed from ^GSPC on identical monthly bars. Alpha is YOUR return minus the S&P's — positive means the optimiser beat the index on expected return alone (it doesn't yet adjust for the volatility difference; check Sharpe in the metrics row for risk-adjusted superiority).",
     benchmark_return: "S&P 500 Expected Return",
     benchmark_vol: "S&P 500 Volatility",
     alpha_label: "Alpha vs Benchmark",
     correlation_title: "Correlation Matrix",
     correlation_subtitle: "Pairwise correlations within the selected portfolio (in-sample).",
+    correlation_help_title: "Correlation matrix",
+    correlation_help_body:
+      "How tightly the monthly returns of the chosen assets move together. Each cell is the Pearson correlation between two assets over the in-sample window: +1 (cyan) = they move in lockstep, 0 = independent, −1 (magenta) = perfect inverse. Markowitz LOVES low / negative correlations — that's where the diversification benefit comes from (variance of the sum < sum of variances). If your portfolio looks like a single cyan block, you're not actually diversified; if you see patches of magenta or near-zero, the optimiser found genuinely independent risk streams.",
     save_title: "Save Portfolio",
     save_subtitle_can: "Save to history (counts toward your daily quota).",
     save_subtitle_cant: "Quota exhausted — request more from Admin.",
+    save_help_title: "Save portfolio",
+    save_help_body:
+      "Persists the full optimisation result (weights, metrics, Monte-Carlo paths, frontier, correlation matrix, your settings) to the History page so you can revisit / compare it later. Saving consumes ONE slot from your daily quota; admin role is unlimited. Tick 'Share publicly' to make it visible to other users on the leaderboard — the data is read-only, no edit access.",
     save_name_placeholder: "Portfolio name",
     save_share_label: "Share with everyone",
     save_notes_placeholder: "Notes (optional)",
@@ -371,6 +393,27 @@ export const en = {
       "The UI crashed during rendering. The exact error message is below — please share it.",
     try_again: "Try again",
     reset_session: "Reset session and re-login",
+  },
+  optimize_progress: {
+    title: "Building portfolio",
+    hint: "Walking through the Markowitz pipeline. Cold price-cache adds 10–30 s; subsequent runs are near-instant.",
+    hint_done: "Done — preparing results.",
+    steps_done: "All steps complete",
+    steps: {
+      loading_catalog: "Loading the Libertex asset catalogue",
+      fetching_prices: "Downloading historical prices from Yahoo Finance (parquet cache hits skipped)",
+      monthly_returns: "Resampling to month-end + computing pct returns; dropping series with implausible spikes",
+      history_filter: "Filtering assets with too little history and non-positive mean return",
+      ranking: "Ranking the survivors by μ/σ (Sharpe-like) and keeping the top N",
+      covariance: "Estimating the covariance matrix Σ with Ledoit-Wolf shrinkage",
+      risk_free: "Pulling the risk-free rate from the 10Y US Treasury (^TNX)",
+      solving_qp: "Solving the Markowitz QP problem in cvxpy",
+      sparsifying: "Iteratively pruning sub-threshold positions and re-solving on the support",
+      metrics: "Computing Sharpe, Sortino, VaR, CVaR and max drawdown",
+      frontier: "Building the efficient frontier (sweeping target returns)",
+      monte_carlo: "Running 5 000 Monte-Carlo trajectories over 12 months",
+      correlations: "Computing the in-sample correlation matrix and comparing to S&P 500",
+    },
   },
   asset_modal: {
     loading: "Loading price history…",

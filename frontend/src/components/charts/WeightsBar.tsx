@@ -1,3 +1,4 @@
+import { useCallback, useRef } from "react";
 import Plot from "react-plotly.js";
 
 import { categoryColor } from "../../utils/format";
@@ -47,6 +48,61 @@ export default function WeightsBar({ weights, height = 460, onBarClick }: Props)
   });
   const customdata = sorted.map((w) => [w.symbol, `$${w.amount_usd.toFixed(0)}`]);
 
+  // Keep `sorted` accessible in event handlers without re-binding on every
+  // render — the imperative click listeners we attach in `onInitialized`
+  // run outside React's render cycle, so they read this ref instead of
+  // closing over a possibly-stale `sorted` array.
+  const sortedRef = useRef(sorted);
+  sortedRef.current = sorted;
+
+  /** Robust bar-click wiring that defeats two Plotly quirks:
+   *
+   *  1. **`plotly_click` is unreliable.** Plotly suppresses the event when
+   *     the cursor moved > ~5 px between mousedown and mouseup. On touchpads
+   *     and high-DPI mice this fires constantly, so user taps silently
+   *     do nothing.
+   *
+   *  2. **Bar paths have `pointer-events: none`.** Plotly puts a transparent
+   *     drag overlay on top to handle hover hit-testing, so listeners on
+   *     the path elements themselves never receive events.
+   *
+   *  Workaround: attach a single DOM `click` listener to the graph div and
+   *  hit-test by geometry. `getBoundingClientRect()` reads from the layout
+   *  tree directly — it doesn't care about `pointer-events`. The browser's
+   *  native `click` event fires on any complete mousedown+mouseup pair on
+   *  the same element, with no MINDRAG threshold, so trackpad drift is fine.
+   *
+   *  Re-runs harmlessly on every relayout — we tag the gd so subsequent
+   *  calls are no-ops. */
+  const wireBarClicks = useCallback(
+    (gd: HTMLElement) => {
+      if (!onBarClick) return;
+      if ((gd as any).__pl_bar_click_bound) return;
+      (gd as any).__pl_bar_click_bound = true;
+      gd.addEventListener("click", (ev) => {
+        const paths = gd.querySelectorAll<SVGPathElement>(
+          ".barlayer .trace.bars .points .point path",
+        );
+        // Hit-test in DOM order. Hover tooltip stays untouched because we
+        // never read or alter pointer-events on the path nodes.
+        for (let i = 0; i < paths.length; i++) {
+          const r = paths[i].getBoundingClientRect();
+          if (
+            r.width > 0 && r.height > 0 &&
+            ev.clientX >= r.left && ev.clientX <= r.right &&
+            ev.clientY >= r.top && ev.clientY <= r.bottom
+          ) {
+            const w = sortedRef.current[i];
+            if (w) onBarClick(w.symbol);
+            ev.stopPropagation();
+            return;
+          }
+        }
+      });
+    },
+    [onBarClick],
+  );
+
   return (
     <Plot
       data={[
@@ -86,11 +142,13 @@ export default function WeightsBar({ weights, height = 460, onBarClick }: Props)
       config={PLOT_CONFIG}
       style={{ width: "100%" }}
       className={onBarClick ? "plotly-clickable" : undefined}
+      onInitialized={(_figure, gd) => wireBarClicks(gd as unknown as HTMLElement)}
+      onUpdate={(_figure, gd) => wireBarClicks(gd as unknown as HTMLElement)}
       onClick={(e: any) => {
-        // Plotly hands us an event with `points`. For a horizontal bar each
-        // point has `pointNumber` (= index in our `sorted` array). We pluck
-        // the symbol from there rather than parsing the label, because the
-        // label is trimmed/aliased.
+        // Belt-and-braces: Plotly's own plotly_click event also wired, in
+        // case the SVG click path is somehow blocked on some browsers. If
+        // both fire the symbol is the same; the parent's state guard makes
+        // double-trigger a no-op.
         if (!onBarClick) return;
         const pt = e?.points?.[0];
         const idx = pt?.pointNumber ?? pt?.pointIndex;

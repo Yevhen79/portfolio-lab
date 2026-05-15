@@ -14,6 +14,7 @@ import PortfolioMetrics from "../components/PortfolioMetrics";
 import AllocationTable from "../components/AllocationTable";
 import AssetHistoryModal from "../components/AssetHistoryModal";
 import HelpTip from "../components/HelpTip";
+import OptimizeProgress from "../components/OptimizeProgress";
 import Section from "../components/Section";
 import { useT, tpl } from "../i18n";
 import { useAuth } from "../store/auth";
@@ -744,13 +745,7 @@ export default function PortfolioBuilder() {
             </div>
           )}
 
-          {busy && !displayResult && (
-            <div className="card p-12 flex flex-col items-center justify-center gap-3">
-              <Loader2 className="w-10 h-10 text-cyan animate-spin" />
-              <div className="text-text-muted">{t.builder.busy_title}</div>
-              <div className="text-xs text-text-dim">{t.builder.busy_hint}</div>
-            </div>
-          )}
+          {busy && !displayResult && <OptimizeProgress busy={busy} />}
 
           {!busy && !displayResult && !error && (
             <div className="card-glow p-12 flex flex-col items-center justify-center gap-4 text-center min-h-[460px] relative overflow-hidden">
@@ -790,12 +785,11 @@ export default function PortfolioBuilder() {
 
           {displayResult && (
             <>
-              <div className="card-glow p-6 relative overflow-hidden">
-                {busy && (
-                  <div className="absolute top-3 right-3 text-cyan animate-pulse text-xs flex items-center gap-1.5">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> updating...
-                  </div>
-                )}
+              {/* Compact progress ribbon during a re-optimisation. The
+                  previous result stays on screen below so the user can
+                  compare before/after. */}
+              {busy && <OptimizeProgress busy={busy} compact />}
+              <div className="card-glow p-6">
                 <PortfolioMetrics data={displayResult} />
               </div>
 
@@ -809,6 +803,11 @@ export default function PortfolioBuilder() {
                   <Section
                     title={t.builder.asset_allocation}
                     subtitle={subtitle}
+                    help={
+                      <HelpTip title={t.builder.aa_help_title} width={380}>
+                        {t.builder.aa_help_body}
+                      </HelpTip>
+                    }
                     action={
                       <span className="text-[11px] text-text-dim italic">{t.asset_modal.click_hint}</span>
                     }
@@ -869,6 +868,11 @@ export default function PortfolioBuilder() {
               <Section
                 title={t.builder.efficient_frontier_title}
                 subtitle={t.builder.efficient_frontier_subtitle}
+                help={
+                  <HelpTip title={t.builder.efficient_frontier_help_title} width={400}>
+                    {t.builder.efficient_frontier_help_body}
+                  </HelpTip>
+                }
                 action={
                   <div className="text-xs text-text-muted flex items-center gap-1.5">
                     <Target className="w-3.5 h-3.5 text-magenta" /> {t.builder.long_only_label} · {displayResult.cov_method}
@@ -886,7 +890,15 @@ export default function PortfolioBuilder() {
                 />
               </Section>
 
-              <Section title={t.builder.forecast_title} subtitle={tpl(t.builder.forecast_subtitle, { n: displayResult.monte_carlo.n_simulations.toLocaleString(), capital: fmtUSD(displayResult.initial_capital, 0), value: fmtUSD(displayResult.monte_carlo.expected_value, 0) })}>
+              <Section
+                title={t.builder.forecast_title}
+                subtitle={tpl(t.builder.forecast_subtitle, { n: displayResult.monte_carlo.n_simulations.toLocaleString(), capital: fmtUSD(displayResult.initial_capital, 0), value: fmtUSD(displayResult.monte_carlo.expected_value, 0) })}
+                help={
+                  <HelpTip title={t.builder.forecast_help_title} width={400}>
+                    {tpl(t.builder.forecast_help_body, { n: displayResult.monte_carlo.n_simulations.toLocaleString() })}
+                  </HelpTip>
+                }
+              >
                 <MonteCarloFan
                   months={displayResult.monte_carlo.months}
                   median={displayResult.monte_carlo.median_path}
@@ -919,13 +931,29 @@ export default function PortfolioBuilder() {
                     </div>
                   ))}
                 </div>
-                <div className="mt-6">
+                <div className="mt-6 pt-5 border-t border-border">
+                  <div className="flex items-start justify-between mb-3">
+                    <h3 className="text-base sm:text-lg font-semibold inline-flex items-center">
+                      {t.builder.distribution_title}
+                      <HelpTip title={t.builder.distribution_help_title} width={400}>
+                        {t.builder.distribution_help_body}
+                      </HelpTip>
+                    </h3>
+                  </div>
                   <DistributionChart paths_sample={displayResult.monte_carlo.paths_sample} initial={displayResult.initial_capital} />
                 </div>
               </Section>
 
               {displayResult.benchmark_comparison?.available && (
-                <Section title={t.builder.benchmark_title} subtitle={t.builder.benchmark_subtitle}>
+                <Section
+                  title={t.builder.benchmark_title}
+                  subtitle={t.builder.benchmark_subtitle}
+                  help={
+                    <HelpTip title={t.builder.benchmark_help_title} width={380}>
+                      {t.builder.benchmark_help_body}
+                    </HelpTip>
+                  }
+                >
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="card p-4">
                       <div className="text-xs text-text-muted uppercase tracking-wider">{t.builder.benchmark_return}</div>
@@ -947,7 +975,15 @@ export default function PortfolioBuilder() {
               )}
 
               {displayResult.correlation_matrix?.symbols?.length > 1 && (
-                <Section title={t.builder.correlation_title} subtitle={t.builder.correlation_subtitle}>
+                <Section
+                  title={t.builder.correlation_title}
+                  subtitle={t.builder.correlation_subtitle}
+                  help={
+                    <HelpTip title={t.builder.correlation_help_title} width={400}>
+                      {t.builder.correlation_help_body}
+                    </HelpTip>
+                  }
+                >
                   <CorrelationHeatmap
                     symbols={displayResult.correlation_matrix.symbols}
                     matrix={displayResult.correlation_matrix.matrix}
@@ -955,7 +991,15 @@ export default function PortfolioBuilder() {
                 </Section>
               )}
 
-              <Section title={t.builder.save_title} subtitle={canSave ? t.builder.save_subtitle_can : t.builder.save_subtitle_cant}>
+              <Section
+                title={t.builder.save_title}
+                subtitle={canSave ? t.builder.save_subtitle_can : t.builder.save_subtitle_cant}
+                help={
+                  <HelpTip title={t.builder.save_help_title} width={360}>
+                    {t.builder.save_help_body}
+                  </HelpTip>
+                }
+              >
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <input className="input md:col-span-2" placeholder={t.builder.save_name_placeholder} value={saveName} onChange={(e) => setSaveName(e.target.value)} />
                   <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-bg-elevated border border-border cursor-pointer">

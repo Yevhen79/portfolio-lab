@@ -7,6 +7,7 @@ import * as api from "../api/portfolios";
 import type { PortfolioOut } from "../api/portfolios";
 import AllocationTable from "../components/AllocationTable";
 import AssetHistoryModal from "../components/AssetHistoryModal";
+import HelpTip from "../components/HelpTip";
 import CorrelationHeatmap from "../components/charts/CorrelationHeatmap";
 import DistributionChart from "../components/charts/DistributionChart";
 import EfficientFrontier from "../components/charts/EfficientFrontier";
@@ -130,6 +131,11 @@ export default function PortfolioView() {
           <Section
             title={t.builder.asset_allocation}
             subtitle={subtitle}
+            help={
+              <HelpTip title={t.builder.aa_help_title} width={380}>
+                {t.builder.aa_help_body}
+              </HelpTip>
+            }
             action={<span className="text-[11px] text-text-dim italic">{t.asset_modal.click_hint}</span>}
           >
             {/* Bar chart spans the whole section — the pie used to duplicate it. */}
@@ -142,7 +148,15 @@ export default function PortfolioView() {
       })()}
 
       {data.efficient_frontier && data.efficient_frontier.length > 0 && (
-        <Section title={t.builder.efficient_frontier_title} subtitle={t.builder.efficient_frontier_subtitle}>
+        <Section
+          title={t.builder.efficient_frontier_title}
+          subtitle={t.builder.efficient_frontier_subtitle}
+          help={
+            <HelpTip title={t.builder.efficient_frontier_help_title} width={400}>
+              {t.builder.efficient_frontier_help_body}
+            </HelpTip>
+          }
+        >
           <EfficientFrontier
             frontier={data.efficient_frontier as any}
             selected={{ return: data.expected_return_annual, risk: data.volatility_annual, label: data.name }}
@@ -155,6 +169,11 @@ export default function PortfolioView() {
         <Section
           title={t.builder.forecast_title}
           subtitle={tpl(t.portfolio_view.forecast_subtitle, { n: data.monte_carlo.n_simulations.toLocaleString(), value: fmtUSD(data.monte_carlo.expected_value, 0) })}
+          help={
+            <HelpTip title={t.builder.forecast_help_title} width={400}>
+              {tpl(t.builder.forecast_help_body, { n: data.monte_carlo.n_simulations.toLocaleString() })}
+            </HelpTip>
+          }
         >
           <MonteCarloFan
             months={data.monte_carlo.months}
@@ -181,14 +200,30 @@ export default function PortfolioView() {
               </div>
             ))}
           </div>
-          <div className="mt-6">
+          <div className="mt-6 pt-5 border-t border-border">
+            <div className="flex items-start justify-between mb-3">
+              <h3 className="text-base sm:text-lg font-semibold inline-flex items-center">
+                {t.builder.distribution_title}
+                <HelpTip title={t.builder.distribution_help_title} width={400}>
+                  {t.builder.distribution_help_body}
+                </HelpTip>
+              </h3>
+            </div>
             <DistributionChart paths_sample={data.monte_carlo.paths_sample} initial={data.initial_capital} />
           </div>
         </Section>
       )}
 
       {data.benchmark_comparison?.available && (
-        <Section title={t.builder.benchmark_title} subtitle={t.builder.benchmark_subtitle}>
+        <Section
+          title={t.builder.benchmark_title}
+          subtitle={t.builder.benchmark_subtitle}
+          help={
+            <HelpTip title={t.builder.benchmark_help_title} width={380}>
+              {t.builder.benchmark_help_body}
+            </HelpTip>
+          }
+        >
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="card p-4">
               <div className="text-xs text-text-muted uppercase tracking-wider">{t.builder.benchmark_return}</div>
@@ -210,7 +245,14 @@ export default function PortfolioView() {
       )}
 
       {data.correlation_matrix?.symbols && data.correlation_matrix.symbols.length > 1 && (
-        <Section title={t.builder.correlation_title}>
+        <Section
+          title={t.builder.correlation_title}
+          help={
+            <HelpTip title={t.builder.correlation_help_title} width={400}>
+              {t.builder.correlation_help_body}
+            </HelpTip>
+          }
+        >
           <CorrelationHeatmap
             symbols={data.correlation_matrix.symbols}
             matrix={data.correlation_matrix.matrix}

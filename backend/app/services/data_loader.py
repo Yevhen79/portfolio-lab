@@ -33,7 +33,18 @@ def _cache_path(symbol: str, frequency: str) -> Path:
     return CACHE_DIR / f"{safe}__{frequency}.parquet"
 
 
-def _load_cached(path: Path, max_age_hours: int = 24) -> Optional[pd.DataFrame]:
+# Default cache freshness window. Monthly bars don't update intra-month and
+# weekly bars update at most once a week, so a 7-day TTL is more than enough
+# for the optimiser's purposes. Tightening this to 24 h was the previous
+# default and meant 100+ assets refetched yfinance on every weekly user
+# session, blowing the 5-minute axios timeout on cold paths.
+DEFAULT_CACHE_TTL_HOURS = 24 * 7  # 7 days
+
+
+def _load_cached(
+    path: Path,
+    max_age_hours: int = DEFAULT_CACHE_TTL_HOURS,
+) -> Optional[pd.DataFrame]:
     if not path.exists():
         return None
     age = datetime.now() - datetime.fromtimestamp(path.stat().st_mtime)
@@ -62,6 +73,12 @@ def fetch_yfinance(
     """Download historical bars for `symbol` from Yahoo Finance.
 
     Returns DataFrame with a single 'close' column indexed by date.
+
+    Cache policy: fresh cache (≤ 7 days old) is returned without any network
+    call. If cache is stale OR missing, we try yfinance; if that fails we
+    fall back to the stale parquet rather than returning None — better to
+    serve a few days of stale prices than to silently drop the asset and
+    skew the universe.
     """
     cache_path = _cache_path(symbol, interval)
     if use_cache:
@@ -83,8 +100,20 @@ def fetch_yfinance(
         )
     except Exception as exc:
         logger.warning("yfinance failed for %s: %s", symbol, exc)
-        return None
+        df = None
+
     if df is None or df.empty:
+        # Graceful fallback: if a parquet exists at all, even stale, use it.
+        # Beats dropping the asset entirely from the universe just because
+        # yfinance rate-limited us this minute.
+        if cache_path.exists():
+            try:
+                stale = pd.read_parquet(cache_path)
+                if not stale.empty:
+                    logger.debug("Using stale cache for %s (yfinance failed)", symbol)
+                    return stale
+            except Exception:
+                pass
         return None
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = [c[0] for c in df.columns]
