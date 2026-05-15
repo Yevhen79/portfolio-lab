@@ -13,6 +13,7 @@ import DistributionChart from "../components/charts/DistributionChart";
 import PortfolioMetrics from "../components/PortfolioMetrics";
 import AllocationTable from "../components/AllocationTable";
 import AssetHistoryModal from "../components/AssetHistoryModal";
+import BuildErrorCard from "../components/BuildErrorCard";
 import HelpTip from "../components/HelpTip";
 import OptimizeProgress from "../components/OptimizeProgress";
 import Section from "../components/Section";
@@ -32,6 +33,11 @@ const DEFAULT_REQ: OptimizeRequest = {
   long_only: true,
   sparsify: true,
   sparsify_threshold: 0.01,
+  // Per-asset cap. 0.35 = no single asset can exceed 35% of the portfolio,
+  // which forces ≥ 3 non-zero positions and prevents the degenerate
+  // "100% in one stock" outcomes the optimiser otherwise picks at the
+  // corners of the feasibility region.
+  max_weight_per_asset: 0.35,
   // Personal-mode cap is 1000 (see FEATURE_FLAGS in backend/config.py). The
   // previous default (100) was a leftover from early dev and silently cut the
   // optimiser off from ~1300 mapped instruments. 500 strikes a balance: wide
@@ -76,7 +82,10 @@ export default function PortfolioBuilder() {
   }));
   const [result, setResult] = useState<OptimizeResponse | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Full error object (axios error or thrown). BuildErrorCard parses the
+  // structured `{code, context}` shape from the backend; the `errorMessage`
+  // helper still works as a fallback for the save flow.
+  const [error, setError] = useState<unknown>(null);
   const [saveName, setSaveName] = useState("");
   const [saveNotes, setSaveNotes] = useState("");
   const [savePublic, setSavePublic] = useState(false);
@@ -115,7 +124,9 @@ export default function PortfolioBuilder() {
         setSaveName(`${map[payload.portfolio_type]} — ${new Date().toLocaleDateString()}`);
       }
     } catch (e) {
-      setError(errorMessage(e, t.builder.optimization_failed));
+      // Keep the FULL error object so BuildErrorCard can parse structured
+      // {code, context} from the backend's 422 response.
+      setError(e);
       setResult(null);
     } finally {
       setBusy(false);
@@ -285,7 +296,7 @@ export default function PortfolioBuilder() {
       await refresh();
       nav(`/portfolio/${saved.id}`);
     } catch (e) {
-      setError(errorMessage(e, "Failed to save portfolio"));
+      setError(e);
     } finally {
       setSaving(false);
     }
@@ -383,21 +394,33 @@ export default function PortfolioBuilder() {
           {req.portfolio_type === "target_return" && (
             <Section
               title={t.builder.target_return_title}
-              subtitle={fmtPct(req.target_return ?? 0.15)}
+              subtitle={t.builder.target_return_subtitle}
               help={
                 <HelpTip title={t.builder.target_return_help_title}>
                   {t.builder.target_return_help_body}
                 </HelpTip>
               }
             >
+              {/* Big-readout pattern, matches Target Risk for consistency. */}
+              <div className="flex items-baseline gap-2 mb-3">
+                <div className="font-mono text-lg font-bold text-cyan">
+                  {fmtPct(req.target_return ?? 0.15)}
+                </div>
+                <div className="text-xs text-text-dim uppercase tracking-wider">
+                  {t.builder.target_return_unit}
+                </div>
+              </div>
               <input
-                type="range" min={0.05} max={0.50} step={0.01}
+                type="range"
+                min={0.05}
+                max={0.50}
+                step={0.01}
                 value={req.target_return ?? 0.15}
                 onChange={(e) => update("target_return", Number(e.target.value))}
-                className="w-full accent-cyan"
+                className="w-full accent-cyan h-2"
               />
               <div className="flex justify-between text-[11px] text-text-muted mt-1">
-                <span>5%</span><span>50%</span>
+                <span>5%</span><span>25%</span><span>50%</span>
               </div>
             </Section>
           )}
@@ -405,65 +428,92 @@ export default function PortfolioBuilder() {
           {req.portfolio_type === "target_risk" && (
             <Section
               title={t.builder.target_risk_title}
-              subtitle={req.target_risk ? fmtPct(req.target_risk) : t.builder.target_risk_subtitle_auto}
+              subtitle={t.builder.target_risk_subtitle}
               help={
                 <HelpTip title={t.builder.target_risk_help_title}>
                   {t.builder.target_risk_help_body}
                 </HelpTip>
               }
             >
+              {/* Prominent value readout. The slider track on its own is
+                  only ~16 px tall; users miss it. Show the current % in
+                  big cyan numerics so the value is the focus, not the
+                  control. Falls back to "auto" when target_risk = null. */}
+              <div className="flex items-baseline gap-2 mb-3">
+                <div className="font-mono text-lg font-bold text-cyan">
+                  {req.target_risk !== null && req.target_risk !== undefined
+                    ? fmtPct(req.target_risk)
+                    : t.builder.target_risk_subtitle_auto}
+                </div>
+                <div className="text-xs text-text-dim uppercase tracking-wider">
+                  {t.builder.target_risk_unit}
+                </div>
+              </div>
               <input
-                type="range" min={0.03} max={0.60} step={0.01}
+                type="range"
+                min={0.03}
+                max={0.60}
+                step={0.01}
                 value={req.target_risk ?? 0.20}
                 onChange={(e) => update("target_risk", Number(e.target.value))}
-                className="w-full accent-cyan"
+                className="w-full accent-cyan h-2"
               />
               <div className="flex justify-between text-[11px] text-text-muted mt-1">
-                <span>3%</span><span>60%</span>
+                <span>3%</span><span>30%</span><span>60%</span>
               </div>
-              <button onClick={() => update("target_risk", null)} className="mt-2 text-xs text-cyan hover:underline">
+              <button
+                onClick={() => update("target_risk", null)}
+                className="mt-3 text-xs text-cyan hover:underline"
+              >
                 {t.builder.target_risk_auto_link}
               </button>
             </Section>
           )}
 
-          <Section
-            title={t.builder.risk_tolerance_title}
-            subtitle={t.builder.risk_tolerance_subtitle}
-            help={
-              <HelpTip title={t.builder.risk_tolerance_help_title} width={340}>
-                {t.builder.risk_tolerance_help_lead}
-                <ul className="mt-1.5 space-y-0.5">
-                  <li><b className="text-magenta">{t.builder.rt_conservative}</b> — {t.builder.risk_tolerance_help_conservative}</li>
-                  <li><b className="text-magenta">{t.builder.rt_moderate}</b> — {t.builder.risk_tolerance_help_moderate}</li>
-                  <li><b className="text-magenta">{t.builder.rt_aggressive}</b> — {t.builder.risk_tolerance_help_aggressive}</li>
-                </ul>
-                {t.builder.risk_tolerance_help_note}
-              </HelpTip>
-            }
-          >
-            <div className="grid grid-cols-3 gap-2">
-              {(
-                [
-                  { v: "conservative", label: t.builder.rt_conservative, hint: t.builder.rt_hint_conservative },
-                  { v: "moderate", label: t.builder.rt_moderate, hint: t.builder.rt_hint_moderate },
-                  { v: "aggressive", label: t.builder.rt_aggressive, hint: t.builder.rt_hint_aggressive },
-                ] as const
-              ).map(({ v, label, hint }) => (
-                <button key={v}
-                  onClick={() => update("risk_tolerance", v)}
-                  title={hint}
-                  className={`px-2 py-2 rounded-lg text-xs font-medium transition-all border ${
-                    req.risk_tolerance === v
-                      ? "border-magenta bg-magenta/10 text-magenta"
-                      : "border-border text-text-muted hover:border-border-accent"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </Section>
+          {/* Risk Tolerance only matters when the user picked Target Risk AND
+              didn't set a numeric target — the optimiser uses it as a
+              Conservative / Moderate / Aggressive fallback for the volatility
+              target. For Min Variance, Max Sharpe and Target Return strategies
+              this control is a no-op, so hiding it removes visual clutter. */}
+          {req.portfolio_type === "target_risk" && (
+            <Section
+              title={t.builder.risk_tolerance_title}
+              subtitle={t.builder.risk_tolerance_subtitle}
+              help={
+                <HelpTip title={t.builder.risk_tolerance_help_title} width={340}>
+                  {t.builder.risk_tolerance_help_lead}
+                  <ul className="mt-1.5 space-y-0.5">
+                    <li><b className="text-magenta">{t.builder.rt_conservative}</b> — {t.builder.risk_tolerance_help_conservative}</li>
+                    <li><b className="text-magenta">{t.builder.rt_moderate}</b> — {t.builder.risk_tolerance_help_moderate}</li>
+                    <li><b className="text-magenta">{t.builder.rt_aggressive}</b> — {t.builder.risk_tolerance_help_aggressive}</li>
+                  </ul>
+                  {t.builder.risk_tolerance_help_note}
+                </HelpTip>
+              }
+            >
+              <div className="grid grid-cols-3 gap-2">
+                {(
+                  [
+                    { v: "conservative", label: t.builder.rt_conservative, hint: t.builder.rt_hint_conservative },
+                    { v: "moderate", label: t.builder.rt_moderate, hint: t.builder.rt_hint_moderate },
+                    { v: "aggressive", label: t.builder.rt_aggressive, hint: t.builder.rt_hint_aggressive },
+                  ] as const
+                ).map(({ v, label, hint }) => (
+                  <button key={v}
+                    onClick={() => update("risk_tolerance", v)}
+                    title={hint}
+                    className={`px-2 py-2 rounded-lg text-xs font-medium transition-all border ${
+                      req.risk_tolerance === v
+                        ? "border-magenta bg-magenta/10 text-magenta"
+                        : "border-border text-text-muted hover:border-border-accent"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </Section>
+          )}
 
           <Section
             title={t.builder.categories_title}
@@ -654,6 +704,35 @@ export default function PortfolioBuilder() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs uppercase tracking-wide text-text-muted inline-flex items-center">
+                    {t.builder.max_weight_label}
+                    <HelpTip title={t.builder.max_weight_help_title} width={380}>
+                      {t.builder.max_weight_help_body}
+                    </HelpTip>
+                  </label>
+                  <span className="font-mono text-cyan">
+                    {req.max_weight_per_asset !== undefined && req.max_weight_per_asset < 1
+                      ? fmtPct(req.max_weight_per_asset)
+                      : t.builder.max_weight_off}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0.10}
+                  max={1.00}
+                  step={0.05}
+                  value={req.max_weight_per_asset ?? 0.35}
+                  onChange={(e) => update("max_weight_per_asset", Number(e.target.value))}
+                  className="w-full accent-cyan"
+                />
+                <div className="flex justify-between text-[11px] text-text-muted mt-1">
+                  <span>10%</span>
+                  <span>35%</span>
+                  <span>{t.builder.max_weight_off}</span>
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs uppercase tracking-wide text-text-muted inline-flex items-center">
                     {t.builder.history_window_label}
                     <HelpTip title={t.builder.history_window_help_title} width={340}>
                       {t.builder.history_window_help_body}
@@ -735,15 +814,7 @@ export default function PortfolioBuilder() {
 
         {/* RIGHT: results */}
         <div className="lg:col-span-8 space-y-6 min-h-[400px]">
-          {error && (
-            <div className="card p-4 flex items-start gap-3 text-red border-red/30">
-              <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
-              <div>
-                <div className="font-medium">{t.builder.optimization_failed}</div>
-                <div className="text-sm text-text-muted">{error}</div>
-              </div>
-            </div>
-          )}
+          {error && <BuildErrorCard error={error} onRetry={() => void runOptimize()} />}
 
           {busy && !displayResult && <OptimizeProgress busy={busy} />}
 

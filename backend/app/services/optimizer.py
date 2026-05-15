@@ -110,13 +110,36 @@ def _make_psd(sigma: np.ndarray, eps: float = 1e-8) -> np.ndarray:
     return (eigvecs * eigvals) @ eigvecs.T
 
 
-def optimize_min_variance(sigma: np.ndarray, long_only: bool = True) -> Optional[np.ndarray]:
+def _apply_max_weight(w_var, constraints, max_weight: Optional[float], n: int) -> None:
+    """Append the per-asset cap `w_i <= max_weight` if a meaningful cap is set.
+
+    Skipped when `max_weight` is None or ≥ 1.0 (i.e. unconstrained) and
+    when the cap would be vacuous (cap × n < 1, mathematically infeasible
+    with `sum(w) = 1`). Caller's responsibility to fall back if the
+    constrained problem turns out infeasible — we just record the constraint
+    when it's meaningful and let cvxpy report status.
+    """
+    if max_weight is None or max_weight >= 1.0:
+        return
+    if max_weight * n < 1.0 - 1e-9:
+        # cap × n < 1 means the simplex is empty under the constraint;
+        # skip rather than guarantee an infeasibility report.
+        return
+    constraints.append(w_var <= max_weight)
+
+
+def optimize_min_variance(
+    sigma: np.ndarray,
+    long_only: bool = True,
+    max_weight: Optional[float] = None,
+) -> Optional[np.ndarray]:
     n = sigma.shape[0]
     sigma_psd = _make_psd(sigma)
     w = cp.Variable(n)
     constraints = [cp.sum(w) == 1]
     if long_only:
         constraints.append(w >= 0)
+    _apply_max_weight(w, constraints, max_weight, n)
     objective = cp.Minimize(cp.quad_form(w, cp.psd_wrap(sigma_psd)))
     if not _solve(cp.Problem(objective, constraints)):
         return None
@@ -128,6 +151,7 @@ def optimize_max_sharpe(
     sigma: np.ndarray,
     rf_monthly: float = 0.0,
     long_only: bool = True,
+    max_weight: Optional[float] = None,
 ) -> Optional[np.ndarray]:
     """Maximize (mu' w - rf) / sqrt(w' Sigma w).
 
@@ -136,18 +160,23 @@ def optimize_max_sharpe(
         min y' Sigma y
         s.t. (mu - rf*1)' y == 1, y >= 0 (if long-only).
     Recover w = y / sum(y).
+
+    Per-asset cap: w_i <= M  ⇔  y_i <= M * sum(y) since w = y/sum(y).
     """
     n = sigma.shape[0]
     sigma_psd = _make_psd(sigma)
     excess = mu - rf_monthly
     if np.all(excess <= 0):
         # all assets dominated by risk-free → fall back to min-variance
-        return optimize_min_variance(sigma, long_only=long_only)
+        return optimize_min_variance(sigma, long_only=long_only, max_weight=max_weight)
 
     y = cp.Variable(n)
     constraints = [excess @ y == 1]
     if long_only:
         constraints.append(y >= 0)
+    if max_weight is not None and max_weight < 1.0 and max_weight * n >= 1.0 - 1e-9:
+        # w_i <= M  →  y_i <= M * sum(y). Linear in y.
+        constraints.append(y <= max_weight * cp.sum(y))
     objective = cp.Minimize(cp.quad_form(y, cp.psd_wrap(sigma_psd)))
     if not _solve(cp.Problem(objective, constraints)):
         return None
@@ -163,6 +192,7 @@ def optimize_target_return(
     sigma: np.ndarray,
     target_return_monthly: float,
     long_only: bool = True,
+    max_weight: Optional[float] = None,
 ) -> Optional[np.ndarray]:
     n = sigma.shape[0]
     sigma_psd = _make_psd(sigma)
@@ -170,6 +200,7 @@ def optimize_target_return(
     constraints = [cp.sum(w) == 1, mu @ w >= target_return_monthly]
     if long_only:
         constraints.append(w >= 0)
+    _apply_max_weight(w, constraints, max_weight, n)
     objective = cp.Minimize(cp.quad_form(w, cp.psd_wrap(sigma_psd)))
     if not _solve(cp.Problem(objective, constraints)):
         return None
@@ -181,6 +212,7 @@ def optimize_target_risk(
     sigma: np.ndarray,
     target_vol_monthly: float,
     long_only: bool = True,
+    max_weight: Optional[float] = None,
 ) -> Optional[np.ndarray]:
     n = sigma.shape[0]
     sigma_psd = _make_psd(sigma)
@@ -191,6 +223,7 @@ def optimize_target_risk(
     ]
     if long_only:
         constraints.append(w >= 0)
+    _apply_max_weight(w, constraints, max_weight, n)
     objective = cp.Maximize(mu @ w)
     if not _solve(cp.Problem(objective, constraints)):
         return None

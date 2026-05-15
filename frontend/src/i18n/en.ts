@@ -41,7 +41,7 @@ export const en = {
     hero_title_em: "Markowitz mean-variance engine",
     hero_title_post: ".",
     hero_subtitle:
-      "Monthly historical data, 20-year horizon, Ledoit-Wolf shrinkage, full Libertex MT5 universe. Efficient frontier · Monte Carlo · benchmark comparison · PDF/Excel export.",
+      "Monthly historical data, 20-year horizon, Ledoit-Wolf shrinkage, full Libertex instrument catalogue. Efficient frontier · Monte Carlo · benchmark comparison · PDF/Excel export.",
     build_new: "Build New Portfolio",
     view_history: "View History",
     compare_btn: "Compare Portfolios",
@@ -62,7 +62,7 @@ export const en = {
   builder: {
     page_title: "Portfolio Builder",
     page_subtitle:
-      "Markowitz mean-variance optimization across the full Libertex MT5 Market universe.",
+      "Markowitz mean-variance optimization across the full Libertex instrument catalogue.",
     today_used: "Today",
     strategy_title: "Strategy",
     strategy_subtitle: "Pick optimization objective.",
@@ -84,13 +84,17 @@ export const en = {
     capital_help_title: "Initial capital",
     capital_help_body:
       "The amount of USD you'd invest into this portfolio today. Used only for display — the optimizer's weights and the 12-month forecast scale linearly with it. Change this anytime; the dashboard re-scales without re-running optimization.",
-    target_return_title: "Target Annual Return",
+    target_return_title: "Target Return",
+    target_return_subtitle: "Annualized return you want the portfolio to deliver.",
+    target_return_unit: "annual",
     target_return_help_title: "Target annual return",
     target_return_help_body:
-      "The annualized return you want the portfolio to achieve. The optimizer picks the weights that hit this return with the lowest possible volatility. If the target is unreachable inside the long-only universe, the closest feasible portfolio is returned.",
-    target_risk_title: "Target Annual Volatility",
-    target_risk_subtitle_auto: "from risk tolerance",
-    target_risk_help_title: "Target annual volatility",
+      "The annualized return you want the portfolio to achieve. The optimizer picks the weights that hit this return with the lowest possible volatility. If the target is unreachable in the long-only asset pool, the closest feasible portfolio is returned.",
+    target_risk_title: "Target Risk",
+    target_risk_subtitle: "Annual portfolio volatility (σ) — your risk budget.",
+    target_risk_subtitle_auto: "auto",
+    target_risk_unit: "annual σ",
+    target_risk_help_title: "Target risk (annual volatility)",
     target_risk_help_body:
       "A cap on annualized standard deviation of returns. The optimizer picks the weights with the highest expected return whose volatility stays under this cap. Volatility is the σ in the (return, σ) efficient-frontier chart.",
     target_risk_auto_link: "Or auto-derive from risk tolerance →",
@@ -111,10 +115,10 @@ export const en = {
     rt_hint_moderate: "Middle of the efficient frontier",
     rt_hint_aggressive: "Near the max-return single asset",
     categories_title: "Asset Categories",
-    categories_subtitle: "Pick which classes to include in the universe.",
+    categories_subtitle: "Pick which asset classes feed the analysis.",
     categories_help_title: "Asset categories",
     categories_help_body:
-      "Restricts the optimization universe to the categories you select. Useful for building focused portfolios — e.g. equities-only, or everything except crypto and FX. By default all 6 categories are selected.",
+      "Restricts the asset pool to the categories you select. Useful for building focused portfolios — e.g. equities-only, or everything except crypto and FX. By default all 6 categories are selected.",
     categories_select_all: "All",
     categories_clear_all: "None",
     cat_stock: "Stocks",
@@ -131,7 +135,7 @@ export const en = {
     min_history_label: "Min history (years)",
     min_history_help_title: "Minimum history filter",
     min_history_help_body:
-      "Excludes any asset with less than this many years of monthly data. Higher values = more reliable per-asset statistics, but smaller universe (newer crypto and recent IPOs get dropped). 6 years is a good balance between data quality and breadth.",
+      "Excludes any asset with less than this many years of monthly data. Higher values = more reliable per-asset statistics, but a smaller pool (newer crypto and recent IPOs get dropped). 6 years is a good balance between data quality and breadth.",
     history_window_label: "History window (years)",
     history_window_help_title: "Estimation lookback",
     history_window_help_body:
@@ -150,11 +154,16 @@ export const en = {
     sparsification_help_title: "Sparsification",
     sparsification_help_body:
       "After optimization, drops weights below this threshold and renormalizes the rest so they still sum to 100%. Removes microscopic positions that are just numerical noise from the solver. ON @ 1% means the saved portfolio will only contain meaningful holdings. The dashboard always hides <1% regardless of this setting.",
-    universe_size_label: "Universe size",
+    universe_size_label: "Instruments for analysis",
     universe_size_all: "All available (~1500)",
-    universe_size_help_title: "Universe size cap",
+    max_weight_label: "Max weight per asset",
+    max_weight_off: "off",
+    max_weight_help_title: "Per-asset concentration cap",
+    max_weight_help_body:
+      "Hard cap on how much capital any single asset can absorb. Default 35% guarantees at minimum 3 non-zero positions and prevents the degenerate '100% in one stock' outcomes Markowitz otherwise produces at the corners of the feasibility region (high target_risk on a small pool, etc.). Drag the slider right to relax — at 100% the constraint is off and the optimiser may concentrate freely. If the requested target_return / target_risk is unreachable WITH the cap, we automatically fall back to the unconstrained solve and log a warning.",
+    universe_size_help_title: "How many instruments to analyse",
     universe_size_help_body:
-      "Hard cap on how many instruments reach the optimiser. The catalogue holds ~1,500 mapped Libertex tickers, but the actual universe passed to Markowitz is smaller after these sequential filters: (1) category & exclusions; (2) yfinance availability; (3) data-quality (drops series with implausible monthly spikes — broken yfinance unit shifts); (4) min-history filter (the biggest cut — newer crypto and recent IPOs get dropped); (5) negative-mean filter (assets that lost money on average historically are out); (6) THIS cap — ranks survivors by μ/σ (Sharpe-like) and keeps the top N. Click \"All available\" to skip the μ/σ ranking step entirely.",
+      "Hard cap on how many instruments reach the optimiser. The catalogue holds ~1,500 mapped Libertex tickers, but the actual asset pool passed to Markowitz is smaller after these sequential filters: (1) category & exclusions; (2) yfinance availability; (3) data-quality (drops series with implausible monthly spikes — broken yfinance unit shifts); (4) min-history filter (the biggest cut — newer crypto and recent IPOs get dropped); (5) negative-mean filter (assets that lost money on average historically are out); (6) THIS cap — ranks survivors by μ/σ (Sharpe-like) and keeps the top N. Click \"All available\" to skip the μ/σ ranking step entirely.",
     create_portfolio: "Create Portfolio",
     rerun_optimization: "Re-run Optimization",
     optimizing: "Optimizing...",
@@ -166,20 +175,20 @@ export const en = {
     placeholder_capital: "Capital",
     placeholder_history: "History",
     placeholder_history_value: "{years} years monthly",
-    placeholder_universe: "Universe",
+    placeholder_universe: "Instruments",
     placeholder_universe_value: "up to {n} assets",
-    busy_title: "Building portfolio across full Libertex universe...",
+    busy_title: "Building portfolio across the full Libertex catalogue...",
     busy_hint: "First run can take 30-60s while prices download.",
     optimization_failed: "Optimization failed",
     asset_allocation: "Asset Allocation",
     aa_subtitle_filtered:
       "{visible} assets shown — {hidden} more had weight < 1% and were merged into shown holdings",
-    aa_subtitle_full: "{visible} assets selected from a universe of {universe}",
+    aa_subtitle_full: "{visible} assets selected from a pool of {universe}",
     aa_help_title: "Asset allocation",
     aa_help_body:
-      "How the optimiser split your capital across the surviving assets, sorted by weight. The bar chart shows each asset's percentage; the table adds USD amount, arithmetic expected return (μ × 12), geometric CAGR, and annual volatility (σ). Click any bar to see the asset's full price history. The × icon at the end of each row drops the asset from the universe and re-runs.",
-    exclude_button_title: "Exclude from the universe and re-optimize",
-    excluded_title: "Excluded from universe",
+      "How the optimiser split your capital across the surviving assets, sorted by weight. The bar chart shows each asset's percentage; the table adds USD amount, arithmetic expected return (μ × 12), geometric CAGR, and annual volatility (σ). Click any bar to see the asset's full price history. The × icon at the end of each row drops the asset from the analysis and re-runs.",
+    exclude_button_title: "Exclude from analysis and re-optimize",
+    excluded_title: "Excluded from analysis",
     excluded_subtitle_one: "{n} asset excluded — click a chip to restore",
     excluded_subtitle_many: "{n} assets excluded — click a chip to restore",
     excluded_clear_all: "Restore all",
@@ -189,7 +198,7 @@ export const en = {
     exclude_section_subtitle: "{n} permanently excluded — saved on this device.",
     exclude_section_help_title: "Permanent exclusions",
     exclude_section_help_body:
-      "Tickers added here are pulled OUT of the universe before optimisation, on every run. The list is saved to localStorage so it survives page reloads on this device. Useful for instruments you can't actually trade (close-only on your broker) or never want exposure to. Accepts a single ticker or comma/space-separated list (\"USDTRY, EURTRY\"). Click a chip to remove.",
+      "Tickers added here are pulled OUT of the asset pool before optimisation, on every run. The list is saved to localStorage so it survives page reloads on this device. Useful for instruments you can't actually trade (close-only on your broker) or never want exposure to. Accepts a single ticker or comma/space-separated list (\"USDTRY, EURTRY\"). Click a chip to remove.",
     exclude_input_placeholder: "Ticker (e.g. USDTRY)",
     exclude_add_button: "Add ticker to exclusions",
     efficient_frontier_title: "Efficient Frontier",
@@ -261,7 +270,7 @@ export const en = {
     config_cov_method: "Cov Method",
     config_history_window: "History Window",
     config_min_history: "Min History",
-    config_universe_size: "Universe Size",
+    config_universe_size: "Instruments analysed",
     config_sparsified: "Sparsified",
     yes: "yes",
     no: "no",
@@ -311,8 +320,8 @@ export const en = {
   },
   admin: {
     page_title: "Admin Panel",
-    page_subtitle: "User management, quotas, and asset universe control.",
-    refresh_libertex: "Refresh Libertex Universe",
+    page_subtitle: "User management, quotas, and asset catalogue control.",
+    refresh_libertex: "Refresh Libertex Catalogue",
     pending_users_title: "Pending User Approvals · {n}",
     pending_users_subtitle: "New registrations awaiting your decision.",
     pending_quota_title: "Pending Quota Requests · {n}",
@@ -342,7 +351,7 @@ export const en = {
     quota_col_status: "Status",
     quota_col_requested: "Requested",
     quota_col_decided: "Decided",
-    libertex_refreshed: "Libertex universe refreshed: +{added} added, {updated} updated, {total} total.",
+    libertex_refreshed: "Libertex catalogue refreshed: +{added} added, {updated} updated, {total} total.",
     libertex_failed: "Failed: ",
     status_approved: "approved",
     status_pending: "pending",
@@ -386,6 +395,88 @@ export const en = {
     col_e_r_annual: "E[r] annual",
     col_cagr_annual: "CAGR",
     col_sigma_annual: "σ annual",
+  },
+  build_errors: {
+    tips_title: "What to try",
+    details_label: "Technical details",
+    retry: "Try again",
+    codes: {
+      EMPTY_UNIVERSE: {
+        title: "Not enough instruments to build a portfolio",
+        body: "After applying your filters only {n_assets} instruments survived — Markowitz needs at least 5 to find a meaningful optimum.",
+        tips: [
+          "Add more asset categories (Stocks, Indices, Commodities, Crypto, FX, ETF)",
+          "Lower the \"Min history\" slider — fewer years required means more assets qualify",
+          "Reduce your excluded-ticker list, or restore previously-excluded names",
+          "Increase \"Instruments for analysis\" so more candidates reach the optimiser",
+        ],
+      },
+      TARGET_RETURN_TOO_HIGH: {
+        title: "Target return is unreachable",
+        body: "You asked for {target} annual return, but the single highest-return asset in your pool tops out at {max_available}. No mix of long-only positions can exceed that.",
+        tips: [
+          "Lower the target return below {max_available}",
+          "Add more aggressive asset categories (Crypto, leveraged ETFs)",
+          "Switch to Max Sharpe — let the optimiser pick the best risk-adjusted point",
+        ],
+      },
+      TARGET_RETURN_UNREACHABLE: {
+        title: "No feasible portfolio for this target return",
+        body: "{target} annual return cannot be hit by any long-only combination of the instruments in your pool.",
+        tips: [
+          "Lower the target return slider",
+          "Expand the analysis pool (more categories, larger pool size)",
+          "Switch strategy to Max Sharpe or Target Risk",
+        ],
+      },
+      TARGET_RISK_TOO_LOW: {
+        title: "Target volatility is below what's achievable",
+        body: "You asked for {target} annual volatility, but the lowest-volatility portfolio possible with your pool is {min_achievable}. You can't go below that without leverage or risk-free assets.",
+        tips: [
+          "Raise the target volatility above {min_achievable}",
+          "Add low-volatility categories (Indices, Commodities, ETF)",
+          "Use Min Variance strategy to get the actual GMVP portfolio",
+        ],
+      },
+      TARGET_RISK_UNREACHABLE: {
+        title: "No feasible portfolio for this target volatility",
+        body: "Target volatility {target} could not be hit by any long-only combination of the available instruments.",
+        tips: [
+          "Pick a target between the GMVP volatility and the highest-volatility single asset",
+          "Expand the analysis pool",
+          "Switch to Max Sharpe or Min Variance",
+        ],
+      },
+      OPTIMIZATION_FAILED: {
+        title: "The optimiser failed to converge",
+        body: "The QP solver could not find a feasible point for portfolio_type='{portfolio_type}'. This usually means your constraints are too tight.",
+        tips: [
+          "Relax the per-asset max weight",
+          "Relax sparsification threshold",
+          "Switch portfolio type",
+        ],
+      },
+      TARGET_RETURN_REQUIRED: {
+        title: "Missing target return",
+        body: "You picked the Target Return strategy but didn't set a target.",
+        tips: ["Move the Target Return slider to a value between 5% and 50%"],
+      },
+      UNKNOWN_PORTFOLIO_TYPE: {
+        title: "Unknown portfolio type",
+        body: "Internal: portfolio_type='{portfolio_type}' isn't recognised. Refresh the page.",
+        tips: [],
+      },
+      INTERNAL: {
+        title: "Something went wrong on the server",
+        body: "{raw}",
+        tips: ["Try again in a few seconds — this is usually transient (yfinance rate-limit)"],
+      },
+      GENERIC: {
+        title: "Portfolio could not be built",
+        body: "{raw}",
+        tips: ["Adjust your settings and try again"],
+      },
+    },
   },
   errors: {
     render_error_title: "Portfolio Lab — render error",

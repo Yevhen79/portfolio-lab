@@ -20,6 +20,7 @@ from app.services import metrics as M
 from app.services import monte_carlo as mc
 from app.services import optimizer as opt
 from app.services import universe as uni
+from app.services.errors import PortfolioBuildError
 
 
 logger = logging.getLogger(__name__)
@@ -47,9 +48,14 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
         exclude_symbols=req.exclude_symbols,
     )
     if returns.empty or len(assets) < 5:
-        raise ValueError(
-            "Universe is empty after filtering. Try lowering min_history_years or "
-            "broadening category filters."
+        raise PortfolioBuildError(
+            "EMPTY_UNIVERSE",
+            {
+                "n_assets": len(assets),
+                "min_history_years": req.min_history_years,
+                "categories": req.categories or [],
+                "exclude_count": len(req.exclude_symbols or []),
+            },
         )
 
     # 2. Parameter estimation (monthly) — cov_method clamped by deployment mode
@@ -65,7 +71,7 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
     # 4. Optimize
     weights = _select_optimizer(req, mu_m, sigma_m, rf_monthly)
     if weights is None:
-        raise ValueError("Optimization failed. Try a different portfolio_type or relax constraints.")
+        raise PortfolioBuildError("OPTIMIZATION_FAILED", {"portfolio_type": req.portfolio_type})
 
     # 5. Sparsify with constraint preservation
     #
@@ -259,56 +265,88 @@ def _select_optimizer(
     sigma_m: np.ndarray,
     rf_monthly: float,
 ) -> Optional[np.ndarray]:
+    """Dispatch to the right cvxpy QP based on req.portfolio_type.
+
+    Adds the per-asset max-weight constraint (defends against degenerate
+    one-asset "portfolios" at the feasibility boundary). If the constrained
+    problem is infeasible we fall back to the unconstrained version with a
+    logged warning — better a concentrated but valid portfolio than a 422.
+    """
     pt = req.portfolio_type
-    if pt == "min_variance":
-        return opt.optimize_min_variance(sigma_m, long_only=req.long_only)
-    if pt == "max_sharpe":
-        return opt.optimize_max_sharpe(mu_m, sigma_m, rf_monthly=rf_monthly, long_only=req.long_only)
-    if pt == "target_return":
-        if req.target_return is None:
-            raise ValueError("target_return is required for portfolio_type='target_return'")
-        target_m = req.target_return / 12.0
-        max_asset_ret_a = float(mu_m.max()) * 12.0
-        if req.target_return > max_asset_ret_a:
-            raise ValueError(
-                f"Target return {req.target_return*100:.1f}% is above the highest individual "
-                f"asset return ({max_asset_ret_a*100:.1f}%). Lower the target or relax constraints."
+    n = sigma_m.shape[0]
+    # Cap can't be lower than 1/n (then `sum w = 1` is infeasible). When the
+    # pool is so small that 1/n > requested cap, relax to 1/n + a hair.
+    cap = req.max_weight_per_asset
+    if cap is not None and cap < 1.0:
+        cap = max(cap, 1.0 / n + 1e-6)
+
+    def _run(max_w):
+        if pt == "min_variance":
+            return opt.optimize_min_variance(sigma_m, long_only=req.long_only, max_weight=max_w)
+        if pt == "max_sharpe":
+            return opt.optimize_max_sharpe(
+                mu_m, sigma_m, rf_monthly=rf_monthly, long_only=req.long_only, max_weight=max_w,
             )
-        result = opt.optimize_target_return(mu_m, sigma_m, target_m, long_only=req.long_only)
-        if result is None:
-            raise ValueError(
-                f"Target return {req.target_return*100:.1f}% is not achievable in this universe. "
-                f"Try a lower target or expand the asset categories."
+        if pt == "target_return":
+            if req.target_return is None:
+                raise PortfolioBuildError("TARGET_RETURN_REQUIRED", {})
+            target_m = req.target_return / 12.0
+            max_asset_ret_a = float(mu_m.max()) * 12.0
+            if req.target_return > max_asset_ret_a:
+                raise PortfolioBuildError(
+                    "TARGET_RETURN_TOO_HIGH",
+                    {"target": req.target_return, "max_available": max_asset_ret_a},
+                )
+            return opt.optimize_target_return(
+                mu_m, sigma_m, target_m, long_only=req.long_only, max_weight=max_w,
             )
-        return result
-    if pt == "target_risk":
-        if req.target_risk is None:
-            w_min = opt.optimize_min_variance(sigma_m, long_only=req.long_only)
-            vol_min_a = M.portfolio_vol_annual(w_min, sigma_m) if w_min is not None else 0.05
-            std_assets = np.sqrt(np.diag(sigma_m)) * np.sqrt(12.0)
-            vol_max_a = float(std_assets.max())
-            target_vol_a = opt.risk_tolerance_to_target_vol(req.risk_tolerance, vol_min_a, vol_max_a)
-        else:
-            target_vol_a = req.target_risk
-            # Sanity check: target volatility must be ≥ GMVP volatility
-            w_gmvp = opt.optimize_min_variance(sigma_m, long_only=req.long_only)
-            if w_gmvp is not None:
-                gmvp_vol_a = M.portfolio_vol_annual(w_gmvp, sigma_m)
-                if target_vol_a < gmvp_vol_a * 0.999:  # tiny epsilon
-                    raise ValueError(
-                        f"Target volatility {target_vol_a*100:.1f}% is below the lowest "
-                        f"achievable volatility for this universe ({gmvp_vol_a*100:.1f}% — "
-                        f"the global minimum-variance portfolio). Raise the target or expand the asset categories."
-                    )
-        target_vol_m = target_vol_a / np.sqrt(12.0)
-        result = opt.optimize_target_risk(mu_m, sigma_m, target_vol_m, long_only=req.long_only)
-        if result is None:
-            raise ValueError(
-                f"Target volatility {target_vol_a*100:.1f}% — solver could not find a feasible "
-                f"portfolio. Try adjusting the target or expanding the asset categories."
+        if pt == "target_risk":
+            if req.target_risk is None:
+                w_min = opt.optimize_min_variance(sigma_m, long_only=req.long_only)
+                vol_min_a = M.portfolio_vol_annual(w_min, sigma_m) if w_min is not None else 0.05
+                std_assets = np.sqrt(np.diag(sigma_m)) * np.sqrt(12.0)
+                vol_max_a = float(std_assets.max())
+                target_vol_a = opt.risk_tolerance_to_target_vol(req.risk_tolerance, vol_min_a, vol_max_a)
+            else:
+                target_vol_a = req.target_risk
+                # Sanity check: target volatility must be ≥ GMVP volatility
+                w_gmvp = opt.optimize_min_variance(sigma_m, long_only=req.long_only)
+                if w_gmvp is not None:
+                    gmvp_vol_a = M.portfolio_vol_annual(w_gmvp, sigma_m)
+                    if target_vol_a < gmvp_vol_a * 0.999:  # tiny epsilon
+                        raise PortfolioBuildError(
+                            "TARGET_RISK_TOO_LOW",
+                            {"target": target_vol_a, "min_achievable": gmvp_vol_a},
+                        )
+            target_vol_m = target_vol_a / np.sqrt(12.0)
+            return opt.optimize_target_risk(
+                mu_m, sigma_m, target_vol_m, long_only=req.long_only, max_weight=max_w,
             )
-        return result
-    raise ValueError(f"Unknown portfolio_type: {pt}")
+        raise PortfolioBuildError("UNKNOWN_PORTFOLIO_TYPE", {"portfolio_type": pt})
+
+    result = _run(cap)
+    if result is None and cap is not None and cap < 1.0:
+        # Constrained problem infeasible — usually means target_return /
+        # target_risk is at the boundary of what's achievable WITH the cap.
+        # Relax the cap and report the unconstrained solution. The user
+        # still sees diversification when feasible; concentrated portfolios
+        # only emerge when the targets demand them.
+        logger.warning(
+            "Optimizer infeasible at max_weight=%.2f for %s; falling back to unconstrained.",
+            cap, pt,
+        )
+        result = _run(None)
+    if result is None and pt == "target_return":
+        raise PortfolioBuildError(
+            "TARGET_RETURN_UNREACHABLE",
+            {"target": req.target_return or 0.0},
+        )
+    if result is None and pt == "target_risk":
+        raise PortfolioBuildError(
+            "TARGET_RISK_UNREACHABLE",
+            {"target": req.target_risk or 0.0},
+        )
+    return result
 
 
 def _build_asset_weights(

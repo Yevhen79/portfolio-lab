@@ -43,6 +43,9 @@ export interface OptimizeRequest {
   long_only: boolean;
   sparsify: boolean;
   sparsify_threshold: number;
+  /** Per-asset hard cap on weight. Prevents single-asset "portfolios" at
+   *  the feasibility boundary. 0.35 default. Set to 1.0 to disable. */
+  max_weight_per_asset?: number;
   max_assets_in_universe: number;
   categories?: string[] | null;
   /** Tickers to PULL OUT of the universe before optimisation. Matched

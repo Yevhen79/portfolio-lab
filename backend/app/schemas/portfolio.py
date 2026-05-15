@@ -16,6 +16,12 @@ class OptimizeRequest(BaseModel):
     long_only: bool = True
     sparsify: bool = True
     sparsify_threshold: float = Field(default=0.01, ge=0.0, le=0.5)
+    # Per-asset hard cap on weight. Prevents the optimiser from producing
+    # degenerate single-asset "portfolios" — which it otherwise will do at
+    # the corners of the feasibility region (e.g. high target_risk on a
+    # narrow pool). Set to 1.0 to disable; default 0.35 gives at minimum
+    # ⌈1 / 0.35⌉ = 3 non-zero positions before the constraint binds.
+    max_weight_per_asset: float = Field(default=0.35, ge=0.05, le=1.0)
     # Hard ceiling = 2000 to leave room for catalog growth; the live Libertex
     # catalogue is ~1500. The frontend slider exposes up to 1500 + an "All"
     # quick-button. Personal-mode `FEATURE_FLAGS.max_assets` clamps the

@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models import User
 from app.schemas import OptimizeRequest, OptimizeResponse
 from app.services import portfolio_engine, quota
+from app.services.errors import PortfolioBuildError
 
 
 logger = logging.getLogger(__name__)
@@ -24,24 +25,33 @@ def optimize(
 ) -> OptimizeResponse:
     """Run optimization. Does NOT consume quota — only saving consumes it.
 
-    Error handling layered so the user never sees an unexplained 500:
-      * `ValueError` from `build_portfolio` (empty universe, infeasible solve)
-        → 422 with the raw message.
+    Error handling, layered:
+      * `PortfolioBuildError` — known infeasibility case (target unreachable,
+        empty universe, etc.). Returns 422 with a structured detail
+        `{"code": "...", "context": {...}}` that the frontend translates.
+      * `ValueError` — anything else the engine surfaces as a "user error".
+        Returns 422 with raw message; rare path, kept for backward compat.
       * Anything else → 500 with class name + message, full traceback logged.
-        Without this, an exception in (say) numpy / yfinance bubbles up as a
-        bare 500 with no detail, which is what surfaced to the frontend as
-        "Request failed with status code 500".
     """
     try:
         return portfolio_engine.build_portfolio(db, req)
+    except PortfolioBuildError as exc:
+        logger.info("Portfolio build rejected: %s (%s)", exc.code, exc.context)
+        raise HTTPException(status_code=422, detail=exc.to_dict())
     except ValueError as exc:
-        logger.warning("Optimization rejected: %s", exc)
-        raise HTTPException(status_code=422, detail=str(exc))
+        logger.warning("Optimization rejected (legacy): %s", exc)
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "GENERIC", "context": {"message": str(exc)}},
+        )
     except Exception as exc:
         logger.exception("Optimization crashed (%s): %s", type(exc).__name__, exc)
         raise HTTPException(
             status_code=500,
-            detail=f"{type(exc).__name__}: {exc}",
+            detail={
+                "code": "INTERNAL",
+                "context": {"message": f"{type(exc).__name__}: {exc}"},
+            },
         )
 
 
