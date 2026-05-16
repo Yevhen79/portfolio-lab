@@ -25,5 +25,12 @@ class Asset(Base):
     mean_monthly_return: Mapped[float | None] = mapped_column(Float, nullable=True)
     std_monthly_return: Mapped[float | None] = mapped_column(Float, nullable=True)
 
+    # Libertex overnight-swap rate for LONG positions. Stored as a daily
+    # decimal: -0.000302 means -0.0302% charged per calendar day held.
+    # The optimiser uses this only when the user toggles "apply swaps" on;
+    # the math is straightforward (μ_monthly += swap_daily * 30) and Σ is
+    # untouched (swap is deterministic, doesn't add variance).
+    swap_buy_daily: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
     last_updated: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

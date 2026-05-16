@@ -181,6 +181,38 @@ def refresh_libertex(_: User = Depends(get_admin_user), db: Session = Depends(ge
     return {"added": added, "updated": updated, "total": len(rows)}
 
 
+@router.get("/swap-refresh-status")
+def swap_refresh_status(_: User = Depends(get_admin_user)):
+    """Return the last-refresh timestamp + whether a job is in flight."""
+    from app.services.swap_refresh import status as swap_status
+    s = swap_status()
+    return {
+        "last_refresh": s.last_refresh.isoformat() if s.last_refresh else None,
+        "next_due_at": s.next_due_at.isoformat() if s.next_due_at else None,
+        "ttl_days": s.ttl_days,
+        "is_stale": s.is_stale,
+        "in_progress": s.in_progress,
+    }
+
+
+@router.post("/refresh-swaps")
+def refresh_swaps(_: User = Depends(get_admin_user)):
+    """Force-trigger a swap-rate refresh now. Idempotent if already running."""
+    from app.services.swap_refresh import refresh_async, status as swap_status
+    scheduled = refresh_async()
+    s = swap_status()
+    return {
+        "scheduled": scheduled,
+        "in_progress": s.in_progress,
+        "last_refresh": s.last_refresh.isoformat() if s.last_refresh else None,
+        "note": (
+            "Refresh scheduled in background — check status in ~60 s."
+            if scheduled
+            else "Another refresh is already in progress; please wait."
+        ),
+    }
+
+
 @router.get("/audit-log")
 def audit_log(limit: int = 100, _: User = Depends(get_admin_user), db: Session = Depends(get_db)):
     rows = db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit).all()

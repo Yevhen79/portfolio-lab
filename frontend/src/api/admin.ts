@@ -69,6 +69,29 @@ export async function refreshLibertex() {
   return r.data;
 }
 
+export interface SwapRefreshStatus {
+  last_refresh: string | null;
+  next_due_at: string | null;
+  ttl_days: number;
+  is_stale: boolean;
+  in_progress: boolean;
+}
+
+export async function getSwapRefreshStatus(): Promise<SwapRefreshStatus> {
+  const r = await api.get("/admin/swap-refresh-status");
+  return r.data;
+}
+
+export async function refreshSwaps(): Promise<{
+  scheduled: boolean;
+  in_progress: boolean;
+  last_refresh: string | null;
+  note: string;
+}> {
+  const r = await api.post("/admin/refresh-swaps");
+  return r.data;
+}
+
 export async function auditLog(limit = 100) {
   const r = await api.get(`/admin/audit-log?limit=${limit}`);
   return r.data;

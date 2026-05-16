@@ -19,6 +19,8 @@ export default function Admin() {
     { daily_limit: 5, weekly_limit: null },
   );
   const [refreshing, setRefreshing] = useState(false);
+  const [swapStatus, setSwapStatus] = useState<adminApi.SwapRefreshStatus | null>(null);
+  const [swapRefreshing, setSwapRefreshing] = useState(false);
 
   async function load() {
     setLoading(true); setError(null);
@@ -33,9 +35,26 @@ export default function Admin() {
     }
   }
 
+  async function loadSwapStatus() {
+    try {
+      setSwapStatus(await adminApi.getSwapRefreshStatus());
+    } catch {
+      /* admin status is informational; ignore transient failures */
+    }
+  }
+
   useEffect(() => {
     void load();
+    void loadSwapStatus();
   }, []);
+
+  // Poll swap status while a refresh is in progress so the UI reflects
+  // completion without a manual page reload.
+  useEffect(() => {
+    if (!swapStatus?.in_progress) return;
+    const id = setInterval(loadSwapStatus, 15000);
+    return () => clearInterval(id);
+  }, [swapStatus?.in_progress]);
 
   async function approveUser(uid: number) {
     await adminApi.approveUser(uid);
@@ -72,6 +91,19 @@ export default function Admin() {
     }
   }
 
+  async function refreshSwaps() {
+    setSwapRefreshing(true);
+    try {
+      const r = await adminApi.refreshSwaps();
+      alert(r.note);
+      await loadSwapStatus();
+    } catch (e) {
+      alert(t.admin.swaps_refresh_failed + errorMessage(e));
+    } finally {
+      setSwapRefreshing(false);
+    }
+  }
+
   const pendingRequests = requests.filter((r) => r.status === "pending");
   const pendingUsers = users.filter((u) => u.status === "pending");
 
@@ -82,11 +114,41 @@ export default function Admin() {
           <h1 className="text-3xl font-bold tracking-tight neon-text inline-block">{t.admin.page_title}</h1>
           <p className="text-text-muted mt-1">{t.admin.page_subtitle}</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={refreshLibertex} disabled={refreshing} className="btn-ghost inline-flex items-center gap-2">
-            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-            {t.admin.refresh_libertex}
-          </button>
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex gap-2 flex-wrap justify-end">
+            <button onClick={refreshLibertex} disabled={refreshing} className="btn-ghost inline-flex items-center gap-2">
+              <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+              {t.admin.refresh_libertex}
+            </button>
+            <button
+              onClick={refreshSwaps}
+              disabled={swapRefreshing || swapStatus?.in_progress}
+              className="btn-ghost inline-flex items-center gap-2"
+              title={t.admin.swaps_refresh_tooltip}
+            >
+              <RefreshCw className={`w-4 h-4 ${swapRefreshing || swapStatus?.in_progress ? "animate-spin" : ""}`} />
+              {t.admin.refresh_swaps}
+            </button>
+          </div>
+          {swapStatus && (
+            <div className="text-xs text-text-muted">
+              {swapStatus.in_progress ? (
+                <span className="text-cyan inline-flex items-center gap-1">
+                  <RefreshCw className="w-3 h-3 animate-spin" />
+                  {t.admin.swaps_in_progress}
+                </span>
+              ) : swapStatus.last_refresh ? (
+                <>
+                  {t.admin.swaps_last_refresh}: <span className="font-mono">{fmtDate(swapStatus.last_refresh)}</span>
+                  {swapStatus.is_stale && (
+                    <span className="ml-2 badge bg-amber/15 text-amber border border-amber/30">{t.admin.swaps_stale}</span>
+                  )}
+                </>
+              ) : (
+                <span className="text-amber">{t.admin.swaps_never_refreshed}</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

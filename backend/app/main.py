@@ -69,6 +69,15 @@ def create_app() -> FastAPI:
             "Portfolio Lab API starting up (deployment_mode=%s)",
             settings.DEPLOYMENT_MODE,
         )
+        # Weekly swap-rate refresh. Checks data/swap_refresh.json — if the
+        # last successful refresh was > 7 days ago (or never), schedules a
+        # background scrape + DB populate. Startup is NOT blocked: the
+        # refresh runs in a daemon thread and writes its result when done.
+        try:
+            from app.services.swap_refresh import maybe_refresh_on_startup
+            maybe_refresh_on_startup()
+        except Exception as exc:
+            logger.warning("Swap-refresh boot check failed: %s", exc)
 
     return app
 

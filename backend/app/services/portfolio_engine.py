@@ -87,9 +87,45 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
             },
         )
 
+    asset_by_yf = {a.yf_symbol: a for a in assets}
+
+    # 1b. Swap-cost adjustment (applied BEFORE μ/Σ estimation so it
+    # propagates to every downstream metric automatically — Sortino, max
+    # drawdown, Monte Carlo, CAGR all see post-swap returns).
+    #
+    # Libertex charges a daily overnight fee for CFD positions
+    # (-0.0302%/day for US stocks ≈ -11% annual). When the user opts in we
+    # subtract `swap_daily * 30` from every monthly return per asset. The
+    # cost is already negative so adding it lowers the series. σ is
+    # unaffected (subtracting a constant doesn't change std-dev), which
+    # matches reality — swap is deterministic, contributes no variance.
+    swap_count = 0
+    swap_median_annual = 0.0
+    if req.apply_swaps:
+        adj_per_col: dict[str, float] = {}
+        nz_costs: list[float] = []
+        for col in returns.columns:
+            a = asset_by_yf.get(col)
+            if a is None:
+                continue
+            daily = float(a.swap_buy_daily or 0.0)
+            if daily == 0:
+                continue
+            adj_per_col[col] = daily * 30.0  # 30-day month
+            nz_costs.append(daily * 365 * 100)
+        if adj_per_col:
+            adj_series = pd.Series(adj_per_col, index=returns.columns).fillna(0.0)
+            returns = returns + adj_series  # broadcast: each col gets its own constant
+            swap_count = len(adj_per_col)
+            swap_median_annual = float(np.median(nz_costs)) if nz_costs else 0.0
+            logger.info(
+                "Applied overnight-swap adjustment to %d assets "
+                "(median annual cost %.2f%%, applied via returns shift).",
+                swap_count, swap_median_annual,
+            )
+
     # 2. Parameter estimation (monthly) — cov_method clamped by deployment mode
     mu_m, sigma_m, columns = opt.estimate_mu_sigma(returns, method=cov_method)
-    asset_by_yf = {a.yf_symbol: a for a in assets}
     ordered_assets = [asset_by_yf[c] for c in columns]
 
     # 3. Risk-free rate (annual decimal). Geometric conversion to monthly:
@@ -103,7 +139,18 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
         raise PortfolioBuildError("OPTIMIZATION_FAILED", {"portfolio_type": req.portfolio_type})
 
     # Trace: record the initial optimisation result before sparsify munches it.
-    _trace_optimization(trace, "Первичная оптимизация", weights, ordered_assets)
+    _trace_optimization(
+        trace,
+        "Первичная оптимизация",
+        weights,
+        ordered_assets,
+        note=(
+            f"С учётом overnight swap-комиссий (медиана {swap_median_annual:.2f}% в год, "
+            f"применено к {swap_count} активам). "
+            if req.apply_swaps and swap_count > 0
+            else "Свопы не учитываются — оптимизация по чистым историческим доходностям."
+        ) + f"Оптимизатор вернул {int((np.abs(weights) > 0.005).sum())} значимых позиций.",
+    )
 
     # 5. Sparsify with constraint preservation
     #

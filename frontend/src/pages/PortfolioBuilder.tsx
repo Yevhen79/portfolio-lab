@@ -39,6 +39,10 @@ const DEFAULT_REQ: OptimizeRequest = {
   // "100% in one stock" outcomes the optimiser otherwise picks at the
   // corners of the feasibility region.
   max_weight_per_asset: 0.35,
+  // Overnight swap costs OFF by default — the historical-only result is
+  // the academic baseline. Users explicitly opt in via the form toggle
+  // when they want the "net of holding cost" Libertex CFD reality.
+  apply_swaps: false,
   // Personal-mode cap is 1000 (see FEATURE_FLAGS in backend/config.py). The
   // previous default (100) was a leftover from early dev and silently cut the
   // optimiser off from ~1300 mapped instruments. 500 strikes a balance: wide
@@ -415,6 +419,45 @@ export default function PortfolioBuilder() {
                   {b.label}
                 </button>
               ))}
+            </div>
+          </Section>
+
+          <Section
+            title={t.builder.swaps_title}
+            subtitle={
+              req.apply_swaps
+                ? t.builder.swaps_subtitle_on
+                : t.builder.swaps_subtitle_off
+            }
+            help={
+              <HelpTip title={t.builder.swaps_help_title} width={380}>
+                {t.builder.swaps_help_body}
+              </HelpTip>
+            }
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm text-text-muted leading-relaxed">
+                {req.apply_swaps
+                  ? t.builder.swaps_status_on
+                  : t.builder.swaps_status_off}
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={req.apply_swaps ?? false}
+                onClick={() => update("apply_swaps", !req.apply_swaps)}
+                className={`shrink-0 inline-flex items-center h-7 w-12 rounded-full border transition-colors ${
+                  req.apply_swaps
+                    ? "bg-cyan/20 border-cyan justify-end"
+                    : "bg-bg-elevated border-border justify-start"
+                }`}
+              >
+                <span
+                  className={`mx-1 w-5 h-5 rounded-full transition-colors ${
+                    req.apply_swaps ? "bg-cyan shadow-glow" : "bg-text-dim"
+                  }`}
+                />
+              </button>
             </div>
           </Section>
 
