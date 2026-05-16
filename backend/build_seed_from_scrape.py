@@ -267,6 +267,10 @@ KNOWN_BAD_STOCK_TICKERS = {
     "FPH",    # Five Point Holdings — yfinance has it but data is thin; example
     "KLAR",   # Klarna pre-IPO listing on Libertex CFD; no yf data
     "SATS",   # EchoStar — keep, has yf data
+    "SK",     # Libertex ticker = Slack Technologies, delisted 2021 (Salesforce
+              # acquisition). Pass-through would map to yfinance "SK" which
+              # quotes SK Inc. / SK Hynix instead — wrong company, wrong price
+              # history. Excluded so the optimiser never picks a poisoned row.
 }
 
 
@@ -283,7 +287,7 @@ def map_forex(symbol: str) -> tuple[str, str, str]:
 STD_TICKER_RE = re.compile(r"^[A-Z][A-Z0-9.&-]{1,6}$")
 
 
-def map_etf(libertex_sym: str) -> tuple[str, str] | None:
+def map_etf(libertex_sym: str, description: str | None = None) -> tuple[str, str] | None:
     """Best-effort Libertex-ETF → yfinance mapping.
 
     Explicit overrides (ETF_MAP) cover the funds we want a friendly name for;
@@ -293,7 +297,8 @@ def map_etf(libertex_sym: str) -> tuple[str, str] | None:
     if libertex_sym in ETF_MAP:
         return ETF_MAP[libertex_sym]
     if STD_TICKER_RE.match(libertex_sym):
-        return (libertex_sym, libertex_sym)
+        name = (description or "").strip() or libertex_sym
+        return (libertex_sym, name)
     return None
 
 
@@ -313,7 +318,7 @@ def map_crypto(libertex_sym: str) -> tuple[str, str] | None:
     return None
 
 
-def map_stock(libertex_sym: str) -> tuple[str, str, str] | None:
+def map_stock(libertex_sym: str, description: str | None = None) -> tuple[str, str, str] | None:
     """Best-effort Libertex-stock → yfinance mapping.
 
     Order:
@@ -321,8 +326,11 @@ def map_stock(libertex_sym: str) -> tuple[str, str, str] | None:
            or for European listings with non-default suffix).
         2. If the label already looks like a standard exchange ticker
            (ALLCAPS, optional dot/dash/ampersand, ≤7 chars), pass through —
-           yfinance accepts this for ~95% of US/EU equities. Worst case
-           it returns no data and the warmup script flags it as inactive.
+           yfinance accepts this for ~95% of US/EU equities. Use the
+           Libertex description column as the friendly name (e.g.
+           "TCTZ" → "Tencent Holdings") so the UI shows a real company
+           name and not just the ticker. Worst case yfinance returns no
+           data and the warmup script flags the row as inactive.
         3. Otherwise skip with a "no mapping" notice.
 
     Returns (yf_symbol, name, currency) or None.
@@ -333,7 +341,10 @@ def map_stock(libertex_sym: str) -> tuple[str, str, str] | None:
         return None
     if STD_TICKER_RE.match(libertex_sym):
         # Pass-through: assume same ticker on yfinance, USD-listed.
-        return (libertex_sym, libertex_sym, "USD")
+        # Prefer the human-readable description from the Libertex page
+        # over the ticker — the table renders this in the "Name" column.
+        name = (description or "").strip() or libertex_sym
+        return (libertex_sym, name, "USD")
     return None
 
 
@@ -347,6 +358,9 @@ def main() -> None:
     for r in raw["rows"]:
         grp = r["group"]
         sym = r["cells"][0]
+        # Stock rows have a "Description" column at cells[1]; other groups
+        # don't. We use it as the friendly name on pass-through mappings.
+        description = r["cells"][1] if len(r["cells"]) >= 2 else None
         category = GROUP_TO_CATEGORY.get(grp)
         if not category:
             skipped.append((grp, sym, "unknown group"))
@@ -391,7 +405,7 @@ def main() -> None:
                 out_rows.append((sym, yf_sym, None, name, "commodity", "USD", False))
 
             elif grp == "ETFs":
-                mapped = map_etf(sym)
+                mapped = map_etf(sym, description)
                 if mapped is None:
                     skipped.append((grp, sym, "no etf mapping"))
                     continue
@@ -399,7 +413,7 @@ def main() -> None:
                 out_rows.append((sym, yf_sym, None, name, "etf", "USD", False))
 
             elif grp == "Stocks":
-                mapped = map_stock(sym)
+                mapped = map_stock(sym, description)
                 if mapped is None:
                     skipped.append((grp, sym, "no stock mapping"))
                     continue
