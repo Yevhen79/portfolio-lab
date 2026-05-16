@@ -563,6 +563,24 @@ export const en = {
         body: "{raw}",
         tips: ["Adjust your settings and try again"],
       },
+      NETWORK: {
+        title: "Could not reach the server",
+        body: "{raw}",
+        tips: [
+          "Check your internet connection",
+          "If the server is behind a tunnel (ngrok / reverse proxy), confirm it's still up",
+          "Retry — the request might just have hit a momentary blip",
+        ],
+      },
+      TIMEOUT: {
+        title: "Request took too long and was cancelled",
+        body: "{raw}",
+        tips: [
+          "Cold-cache runs with a wide universe can take 60+ seconds — try again, the cache is now warm",
+          "Reduce \"Instruments for analysis\" in Advanced (e.g. 200 instead of 500) to lower wall time",
+          "Trim asset categories you don't actually need",
+        ],
+      },
     },
   },
   errors: {

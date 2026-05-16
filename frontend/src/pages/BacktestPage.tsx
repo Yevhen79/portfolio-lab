@@ -16,7 +16,7 @@
  * drift apart over time as backtest-specific niceties (range presets,
  * walk-forward, etc.) accrue.
  */
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   Ban,
   CalendarClock,
@@ -35,6 +35,7 @@ import type { OptimizeRequest } from "../api/portfolios";
 import AllocationTable from "../components/AllocationTable";
 import BuildErrorCard from "../components/BuildErrorCard";
 import HelpTip from "../components/HelpTip";
+import OptimizeProgress from "../components/OptimizeProgress";
 import Section from "../components/Section";
 import WeightsBar from "../components/charts/WeightsBar";
 import { useT, tpl } from "../i18n";
@@ -766,14 +767,9 @@ export default function BacktestPage() {
 
         {/* RIGHT: results */}
         <div className="lg:col-span-8 space-y-6 min-h-[400px]">
-          {error !== null && <BuildErrorCard error={error} onRetry={() => void run()} />}
+          {error !== null && !busy && <BuildErrorCard error={error} onRetry={() => void run()} />}
 
-          {busy && !result && (
-            <div className="card-glow p-12 flex flex-col items-center justify-center gap-4 text-center min-h-[460px]">
-              <Loader2 className="w-12 h-12 animate-spin text-cyan" />
-              <p className="text-text-muted">{t.backtest.running}</p>
-            </div>
-          )}
+          {busy && !result && <OptimizeProgress busy={busy} />}
 
           {!busy && !result && !error && (
             <div className="card-glow p-12 flex flex-col items-center justify-center gap-4 text-center min-h-[460px] relative overflow-hidden">
@@ -1058,7 +1054,3 @@ function RealizedEquityChart({
   );
 }
 
-// Suppress unused-helper warning from the linter — useMemo is used in
-// the live builder for MC scaling but not here; keep import in case the
-// realized equity chart grows scaling logic later.
-void useMemo;

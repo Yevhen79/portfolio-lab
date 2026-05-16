@@ -20,16 +20,57 @@ interface Props {
 }
 
 /** Parses the diverse error shapes our axios client can hand us and
- *  returns the structured detail when present. */
+ *  returns the structured detail when present, or a synthesised
+ *  best-effort detail for non-structured failures so the GENERIC body
+ *  has something useful to show instead of an empty `{raw}`. */
 function asStructured(error: unknown): BuildErrorDetail | null {
-  if (typeof error !== "object" || error === null) return null;
-  // Axios error shape: error.response.data.detail
-  const ax = error as { response?: { data?: { detail?: any } } };
+  if (typeof error !== "object" || error === null) {
+    // Plain string thrown / non-object — render as raw message.
+    return {
+      code: "GENERIC",
+      context: { message: typeof error === "string" ? error : "Unknown error" },
+    };
+  }
+  const ax = error as {
+    response?: { status?: number; statusText?: string; data?: { detail?: any } };
+    message?: string;
+    code?: string;
+  };
+
+  // Happy path: backend's structured PortfolioBuildError → exact code+context.
   const detail = ax.response?.data?.detail;
   if (detail && typeof detail === "object" && typeof detail.code === "string") {
     return { code: detail.code, context: detail.context ?? {} };
   }
-  return null;
+
+  // Network / timeout / non-Axios error — no response at all. Surface
+  // the axios message so the user knows whether to retry vs adjust.
+  if (!ax.response) {
+    const msg = ax.message || "Network error";
+    const isTimeout = ax.code === "ECONNABORTED" || /timeout/i.test(msg);
+    return {
+      code: isTimeout ? "TIMEOUT" : "NETWORK",
+      context: { message: msg, http_code: ax.code },
+    };
+  }
+
+  // HTTP error with non-structured body (500 stack-trace, 502 from a
+  // reverse proxy, 504 gateway timeout, etc.). Stringify whatever we got.
+  const status = ax.response.status ?? 0;
+  const statusText = ax.response.statusText || "";
+  const rawBody = ax.response.data;
+  let rawText: string;
+  if (typeof rawBody === "string") {
+    rawText = rawBody;
+  } else if (rawBody && typeof rawBody === "object" && typeof (rawBody as any).detail === "string") {
+    rawText = (rawBody as any).detail;
+  } else {
+    rawText = JSON.stringify(rawBody ?? "", null, 2).slice(0, 500);
+  }
+  return {
+    code: "GENERIC",
+    context: { message: `HTTP ${status} ${statusText}: ${rawText}`, http_status: status },
+  };
 }
 
 /** Formats a number with up to 1 decimal as a percentage — used by
