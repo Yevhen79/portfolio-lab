@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Activity,
   BarChart3,
+  CalendarClock,
   GitCompare,
   History,
   LogOut,
@@ -85,6 +86,9 @@ export default function Navbar() {
           </Link>
           <Link to="/build" className={desktopLinkClass("/build")}>
             <Plus className="w-4 h-4" /> {t.nav.build}
+          </Link>
+          <Link to="/backtest" className={desktopLinkClass("/backtest")}>
+            <CalendarClock className="w-4 h-4" /> {t.nav.backtest}
           </Link>
           <Link to="/history" className={desktopLinkClass("/history")}>
             <History className="w-4 h-4" /> {t.nav.history}
@@ -190,6 +194,9 @@ export default function Navbar() {
               </Link>
               <Link to="/build" className={mobileLinkClass("/build")}>
                 <Plus className="w-5 h-5" /> {t.nav.build}
+              </Link>
+              <Link to="/backtest" className={mobileLinkClass("/backtest")}>
+                <CalendarClock className="w-5 h-5" /> {t.nav.backtest}
               </Link>
               <Link to="/history" className={mobileLinkClass("/history")}>
                 <History className="w-5 h-5" /> {t.nav.history}

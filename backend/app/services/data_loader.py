@@ -69,6 +69,7 @@ def fetch_yfinance(
     interval: str = "1mo",
     years: int = 20,
     use_cache: bool = True,
+    as_of_date: Optional[datetime] = None,
 ) -> Optional[pd.DataFrame]:
     """Download historical bars for `symbol` from Yahoo Finance.
 
@@ -79,12 +80,20 @@ def fetch_yfinance(
     fall back to the stale parquet rather than returning None — better to
     serve a few days of stale prices than to silently drop the asset and
     skew the universe.
+
+    `as_of_date`: if provided, the returned DataFrame is cropped so no row
+    has a timestamp later than this date. Used by the backtest path so the
+    optimiser "sees" only the history that would have been available on the
+    chosen historical date. The cache (parquet on disk) still holds the
+    full history — we slice in memory after load. This means the same disk
+    cache serves both live optimise and backtest at any past date without
+    triggering extra network calls.
     """
     cache_path = _cache_path(symbol, interval)
     if use_cache:
         cached = _load_cached(cache_path)
         if cached is not None and not cached.empty:
-            return cached
+            return _crop_as_of(cached, as_of_date)
 
     end = datetime.now()
     start = end - timedelta(days=years * 365)
@@ -111,7 +120,7 @@ def fetch_yfinance(
                 stale = pd.read_parquet(cache_path)
                 if not stale.empty:
                     logger.debug("Using stale cache for %s (yfinance failed)", symbol)
-                    return stale
+                    return _crop_as_of(stale, as_of_date)
             except Exception:
                 pass
         return None
@@ -123,7 +132,21 @@ def fetch_yfinance(
     out.index = pd.to_datetime(out.index)
     out = out[~out.index.duplicated(keep="last")]
     _save_cache(out, cache_path)
-    return out
+    return _crop_as_of(out, as_of_date)
+
+
+def _crop_as_of(df: pd.DataFrame, as_of_date: Optional[datetime]) -> pd.DataFrame:
+    """Drop rows with index > as_of_date. Returns df unchanged if as_of None."""
+    if as_of_date is None or df is None or df.empty:
+        return df
+    cutoff = pd.Timestamp(as_of_date)
+    # Strip tz if the parquet has tz-aware index but the cutoff is naive
+    # (or vice versa) — pandas refuses to compare otherwise.
+    if df.index.tz is not None and cutoff.tz is None:
+        cutoff = cutoff.tz_localize(df.index.tz)
+    elif df.index.tz is None and cutoff.tz is not None:
+        cutoff = cutoff.tz_localize(None)
+    return df[df.index <= cutoff]
 
 
 def fetch_many(
@@ -131,10 +154,13 @@ def fetch_many(
     interval: str = "1mo",
     years: int = 20,
     use_cache: bool = True,
+    as_of_date: Optional[datetime] = None,
 ) -> Dict[str, pd.DataFrame]:
     out: Dict[str, pd.DataFrame] = {}
     for sym in symbols:
-        df = fetch_yfinance(sym, interval=interval, years=years, use_cache=use_cache)
+        df = fetch_yfinance(
+            sym, interval=interval, years=years, use_cache=use_cache, as_of_date=as_of_date,
+        )
         if df is not None and not df.empty:
             out[sym] = df
     return out
@@ -254,8 +280,14 @@ def fetch_risk_free_annual() -> float:
     return float(last / 100.0)
 
 
-def fetch_benchmark_returns(symbol: str = "^GSPC", years: int = 20) -> Optional[pd.DataFrame]:
-    df = fetch_yfinance(symbol, interval="1mo", years=years, use_cache=True)
+def fetch_benchmark_returns(
+    symbol: str = "^GSPC",
+    years: int = 20,
+    as_of_date: Optional[datetime] = None,
+) -> Optional[pd.DataFrame]:
+    df = fetch_yfinance(
+        symbol, interval="1mo", years=years, use_cache=True, as_of_date=as_of_date,
+    )
     if df is None or df.empty:
         return None
     df = df.copy()

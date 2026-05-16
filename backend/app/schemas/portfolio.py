@@ -41,6 +41,15 @@ class OptimizeRequest(BaseModel):
     # history / negative-mean filters, so it doesn't affect the rest of the
     # universe's composition.
     exclude_symbols: List[str] = Field(default_factory=list)
+    # Optional "as-of" date (ISO YYYY-MM-DD). When provided, the optimiser
+    # only sees price history up to and including this date — used by the
+    # backtest path to reproduce the portfolio that would have been built
+    # on a historical date without future leakage. Live optimise leaves
+    # this None and the engine uses everything up to today.
+    as_of_date: Optional[str] = Field(
+        default=None,
+        description="ISO date 'YYYY-MM-DD'; backtest mode optimises using only data up to this date",
+    )
 
 
 class AssetWeight(BaseModel):

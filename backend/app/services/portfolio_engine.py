@@ -44,6 +44,18 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
     history_cap = settings.feature("history_max_years", req.history_years)
     history_years = min(req.history_years, history_cap)
 
+    # Parse optional as-of cutoff. Anything in the future is silently treated
+    # as "no cutoff" — the engine doesn't need to validate that here because
+    # the backtest endpoint enforces the past-date rule before calling us.
+    as_of_dt: Optional[datetime] = None
+    if req.as_of_date:
+        try:
+            as_of_dt = datetime.fromisoformat(req.as_of_date)
+            if as_of_dt > datetime.now():
+                as_of_dt = None
+        except (TypeError, ValueError):
+            as_of_dt = None
+
     # Initialise the trace collector. Every filter / optimisation step
     # appends to it; we render to a downloadable Markdown file at the end.
     trace = BuildTrace(
@@ -63,6 +75,7 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
             "Инструментов для анализа (cap)": max_assets,
             "Категории": req.categories or [],
             "Исключения": req.exclude_symbols or [],
+            **({"As-of дата (бектест)": as_of_dt.strftime("%Y-%m-%d")} if as_of_dt else {}),
         }
     )
 
@@ -75,6 +88,7 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
         max_assets=max_assets,
         exclude_symbols=req.exclude_symbols,
         trace=trace,
+        as_of_date=as_of_dt,
     )
     if returns.empty or len(assets) < 5:
         raise PortfolioBuildError(
@@ -332,7 +346,7 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
     corr_mat = _correlation_dict(ordered_assets, sigma_m, weights)
 
     # 10. Benchmark comparison vs S&P 500
-    bench = _benchmark_comparison(req.initial_capital, ret_a, vol_a)
+    bench = _benchmark_comparison(req.initial_capital, ret_a, vol_a, as_of_date=as_of_dt)
 
     # 11. Build asset weight table
     asset_weights = _build_asset_weights(
@@ -586,8 +600,13 @@ def _empty_monte_carlo(initial_capital: float) -> Dict[str, Any]:
     }
 
 
-def _benchmark_comparison(initial_capital: float, port_ret_a: float, port_vol_a: float) -> Dict[str, Any]:
-    bench = dl.fetch_benchmark_returns("^GSPC", years=20)
+def _benchmark_comparison(
+    initial_capital: float,
+    port_ret_a: float,
+    port_vol_a: float,
+    as_of_date: Optional[datetime] = None,
+) -> Dict[str, Any]:
+    bench = dl.fetch_benchmark_returns("^GSPC", years=20, as_of_date=as_of_date)
     if bench is None or bench.empty:
         return {
             "available": False,

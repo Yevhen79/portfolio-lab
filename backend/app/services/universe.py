@@ -4,6 +4,7 @@ applies filters, returns a clean returns DataFrame ready for optimization.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -107,11 +108,19 @@ def assemble_returns(
     max_assets: int = 300,
     exclude_symbols: Optional[List[str]] = None,
     trace: Optional[BuildTrace] = None,
+    as_of_date: Optional[datetime] = None,
 ) -> Tuple[pd.DataFrame, List[Asset]]:
     """Return (monthly_returns_df, list_of_assets_in_order_of_columns).
 
     When `trace` is provided, each filter step appends its kept/dropped
     membership to the trace for post-mortem inspection.
+
+    `as_of_date`: if set, every price series is cropped at that date BEFORE
+    filters run, so the universe-trimming decisions (min history, negative
+    mean, top-by-Sharpe) only see information that would have been
+    available on that historical date. This is what makes the backtest
+    honest — without it, the optimiser implicitly peeks into the future
+    when deciding which assets to keep.
     """
     assets = load_active_assets(
         db, categories=categories, exclude_symbols=exclude_symbols, trace=trace,
@@ -128,7 +137,9 @@ def assemble_returns(
     structural_drops: list[tuple[str, str, str]] = []
     for a in assets:
         interval = "1wk" if a.is_crypto else "1mo"
-        df = dl.fetch_yfinance(a.yf_symbol, interval=interval, years=history_years)
+        df = dl.fetch_yfinance(
+            a.yf_symbol, interval=interval, years=history_years, as_of_date=as_of_date,
+        )
         if df is None or df.empty:
             yfinance_misses.append((a.symbol, a.name or a.symbol, "yfinance не вернул данных (вероятно делистинг)"))
             continue
