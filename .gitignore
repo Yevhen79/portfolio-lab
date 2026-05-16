@@ -10,6 +10,7 @@ backend/data/*.db-journal
 backend/data/prices/
 backend/data/exports/
 backend/data/backups/
+backend/data/traces/
 backend/logs/
 backend/install.log
 

@@ -13,6 +13,8 @@ import numpy as np
 import pandas as pd
 from sqlalchemy.orm import Session
 
+from pathlib import Path
+
 from app.config import settings
 from app.schemas import OptimizeRequest, OptimizeResponse, AssetWeight
 from app.services import data_loader as dl
@@ -21,9 +23,13 @@ from app.services import monte_carlo as mc
 from app.services import optimizer as opt
 from app.services import universe as uni
 from app.services.errors import PortfolioBuildError
+from app.services.trace import BuildTrace
 
 
 logger = logging.getLogger(__name__)
+
+
+TRACES_DIR = Path(settings.BACKUPS_DIR).parent / "traces"
 
 
 def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
@@ -38,6 +44,28 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
     history_cap = settings.feature("history_max_years", req.history_years)
     history_years = min(req.history_years, history_cap)
 
+    # Initialise the trace collector. Every filter / optimisation step
+    # appends to it; we render to a downloadable Markdown file at the end.
+    trace = BuildTrace(
+        request_summary={
+            "Стратегия": req.portfolio_type,
+            "Капитал, USD": req.initial_capital,
+            "Риск-толерантность": req.risk_tolerance,
+            "Target return": req.target_return,
+            "Target risk": req.target_risk,
+            "Окно истории, лет": history_years,
+            "Мин. история, лет": req.min_history_years,
+            "Метод ковариации": cov_method,
+            "Long-only": req.long_only,
+            "Sparsify": req.sparsify,
+            "Sparsify ≥": req.sparsify_threshold,
+            "Макс. вес одного актива": req.max_weight_per_asset,
+            "Инструментов для анализа (cap)": max_assets,
+            "Категории": req.categories or [],
+            "Исключения": req.exclude_symbols or [],
+        }
+    )
+
     # 1. Universe + returns (user-excluded symbols pulled out before estimation)
     returns, assets = uni.assemble_returns(
         db,
@@ -46,6 +74,7 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
         categories=req.categories,
         max_assets=max_assets,
         exclude_symbols=req.exclude_symbols,
+        trace=trace,
     )
     if returns.empty or len(assets) < 5:
         raise PortfolioBuildError(
@@ -73,6 +102,9 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
     if weights is None:
         raise PortfolioBuildError("OPTIMIZATION_FAILED", {"portfolio_type": req.portfolio_type})
 
+    # Trace: record the initial optimisation result before sparsify munches it.
+    _trace_optimization(trace, "Первичная оптимизация", weights, ordered_assets)
+
     # 5. Sparsify with constraint preservation
     #
     # Naively zeroing weights < threshold and renormalising would BREAK every
@@ -87,7 +119,29 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
     #      sub-portfolio's GMVP vol), fall back to simple zero+renormalise
     #      and accept the small constraint slip with a logged warning.
     sparsified = False
+    # Adapt the user-supplied threshold to the actual diversification the
+    # optimiser produced. Without this guardrail, a 5% threshold on a
+    # max-Sharpe portfolio spread across 56 assets at ~1.8% each will kill
+    # 52 of them, leaving only the few accidental >5% positions — typically
+    # correlated FX pairs — and the iterative re-solve collapses to a single
+    # asset. The portfolio Sharpe drops from ~1.5 to 0.06 even though the
+    # math is "correct". We silently cap at 1/N where N is the count of
+    # non-trivial (>0.5%) initial weights, so the cleanup never destroys
+    # diversification the optimiser deliberately built in.
+    effective_threshold = req.sparsify_threshold
     if req.sparsify and req.sparsify_threshold > 0:
+        n_significant = int((np.abs(weights) > 0.005).sum())
+        if n_significant > 0:
+            diversification_cap = 1.0 / n_significant
+            if effective_threshold > diversification_cap:
+                logger.info(
+                    "Sparsify threshold %.3f would destroy diversification across %d "
+                    "non-trivial positions; capping at %.3f (1/n).",
+                    effective_threshold, n_significant, diversification_cap,
+                )
+                effective_threshold = diversification_cap
+
+    if req.sparsify and effective_threshold > 0:
         # Iterative sparsify-and-resolve. The naive single-pass approach
         # (`keep = w >= threshold; re-optimise on keep`) fails twice:
         #   (a) When the original portfolio is naturally diversified (every
@@ -110,14 +164,14 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
         MIN_SUPPORT = 2
 
         for iteration in range(MAX_ITERS):
-            keep_mask = weights >= req.sparsify_threshold
+            keep_mask = weights >= effective_threshold
             n_keep = int(keep_mask.sum())
 
             # Case 1: nothing clears threshold — fallback to top-K by weight,
             # K = ceil(1/threshold). This is the densest portfolio
             # theoretically compatible with the threshold (equal-weight floor).
             if n_keep == 0:
-                max_n = int(np.ceil(1.0 / req.sparsify_threshold))
+                max_n = int(np.ceil(1.0 / effective_threshold))
                 n_keep = max(MIN_SUPPORT, min(max_n, len(weights) - 1))
                 idx = np.argsort(-weights)[:n_keep]
                 keep_mask = np.zeros_like(weights, dtype=bool)
@@ -125,7 +179,7 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
                 logger.info(
                     "Sparsify iter %d: threshold=%.3f cleared no assets; "
                     "top-%d fallback engaged.",
-                    iteration, req.sparsify_threshold, n_keep,
+                    iteration, effective_threshold, n_keep,
                 )
 
             # Case 2: every survivor clears threshold AND we already trimmed
@@ -149,9 +203,9 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
                 logger.warning(
                     "Sparsify iter %d: re-opt on %d assets infeasible for %s "
                     "@ threshold=%.3f; using naive zero-and-renormalise.",
-                    iteration, len(idx), req.portfolio_type, req.sparsify_threshold,
+                    iteration, len(idx), req.portfolio_type, effective_threshold,
                 )
-                new_w = opt.sparsify_weights(weights, threshold=req.sparsify_threshold)
+                new_w = opt.sparsify_weights(weights, threshold=effective_threshold)
                 if not np.allclose(new_w, weights):
                     weights = new_w
                     sparsified = True
@@ -161,21 +215,39 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
             new_weights[idx] = sub_w
             # If the new support is identical AND nobody is below threshold,
             # we've converged.
-            if np.allclose(new_weights, weights) and (sub_w >= req.sparsify_threshold).all():
+            if np.allclose(new_weights, weights) and (sub_w >= effective_threshold).all():
                 weights = new_weights
                 sparsified = True
                 break
             weights = new_weights
             sparsified = True
 
-        below = int(((weights > 1e-9) & (weights < req.sparsify_threshold)).sum())
+        below = int(((weights > 1e-9) & (weights < effective_threshold)).sum())
         if below > 0:
             logger.info(
                 "Sparsify converged with %d/%d positions still below threshold "
                 "%.3f — Markowitz diversification fights the floor; user gets the "
                 "concentrated mix.",
-                below, int((weights > 1e-9).sum()), req.sparsify_threshold,
+                below, int((weights > 1e-9).sum()), effective_threshold,
             )
+
+    # Trace: final allocation after sparsification.
+    if sparsified:
+        _trace_optimization(
+            trace,
+            f"После прореживания (sparsify ≥ {effective_threshold:.2%})",
+            weights,
+            ordered_assets,
+            note=(
+                f"Пользовательский порог {req.sparsify_threshold:.2%}, реально применённый "
+                f"{effective_threshold:.2%}. "
+                + (
+                    "Порог автоматически снижен для сохранения диверсификации, "
+                    "найденной max-Sharpe."
+                    if effective_threshold < req.sparsify_threshold else ""
+                )
+            ),
+        )
 
     # 6. Annualized portfolio metrics
     ret_a = M.portfolio_return_annual(weights, mu_m)        # arithmetic μ × 12
@@ -232,6 +304,22 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
     else:
         start = end = ""
 
+    # 13. Finalise the trace with portfolio-level metrics and write to disk.
+    trace.final_summary = {
+        "Активов в портфеле (вес > 0.5%)": int((np.abs(weights) > 0.005).sum()),
+        "Ожидаемая доходность (год)": f"{ret_a:.2%}",
+        "CAGR (геометрический)": f"{cagr_portfolio:.2%}",
+        "Волатильность (год)": f"{vol_a:.2%}",
+        "Коэф. Шарпа": f"{sharpe:.3f}",
+        "Коэф. Сортино": f"{sortino:.3f}",
+        "VaR 95%": f"{var_cvar.get('var_95', 0):.2%}",
+        "CVaR 95%": f"{var_cvar.get('cvar_95', 0):.2%}",
+        "Историческая макс. просадка": f"{max_dd:.2%}",
+        "Безрисковая ставка (^TNX)": f"{rf_annual:.2%}",
+        "Окно оценки": f"{start} → {end}",
+    }
+    trace_id = trace.save(TRACES_DIR)
+
     return OptimizeResponse(
         portfolio_type=req.portfolio_type,
         initial_capital=float(req.initial_capital),
@@ -256,6 +344,40 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
         cov_method=req.cov_method,
         estimation_window_start=start,
         estimation_window_end=end,
+        trace_id=trace_id,
+    )
+
+
+def _trace_optimization(
+    trace: BuildTrace,
+    name: str,
+    weights: np.ndarray,
+    ordered_assets: list,
+    note: str = "",
+) -> None:
+    """Append an optimisation step to the trace.
+
+    `kept` = assets with weight > 0.5% (rounded down for readability).
+    `dropped` = assets in the input pool that ended up at ≤ 0.5%.
+    Sorted by weight descending so the trace reads top-down.
+    """
+    rows = list(zip(ordered_assets, weights))
+    rows.sort(key=lambda r: -float(r[1]))
+    kept: list[tuple[str, str]] = []
+    dropped: list[tuple[str, str, str]] = []
+    for a, w in rows:
+        w_f = float(w)
+        sym = a.symbol or "?"
+        label = a.name or sym
+        if w_f > 0.005:
+            kept.append((sym, f"{label} — вес {w_f:.2%}"))
+        else:
+            dropped.append((sym, label, f"вес после оптимизации {w_f:.2%} (< 0.5%)"))
+    trace.add_step(
+        name=name,
+        kept=kept,
+        dropped=dropped,
+        note=note or f"Оптимизатор вернул {len(kept)} значимых позиций из {len(rows)} активов на входе.",
     )
 
 

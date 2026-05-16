@@ -101,3 +101,18 @@ body {
 .plotly-clickable .barlayer path {
   cursor: pointer !important;
 }
+
+/* Touch-action override for Plotly charts. By default Plotly intercepts
+   touchstart/touchmove on its drag layer for pan/zoom — meaning a
+   vertical finger-drag on a chart on mobile gets eaten and the page
+   doesn't scroll. `pan-y` tells the browser "this element handles
+   horizontal gestures only; let vertical swipes pass through to scroll
+   the page". The bar-click handler still fires because click events are
+   separate from pan gestures. */
+.js-plotly-plot,
+.js-plotly-plot .plot-container,
+.js-plotly-plot .svg-container,
+.js-plotly-plot .nsewdrag,
+.js-plotly-plot .drag {
+  touch-action: pan-y !important;
+}

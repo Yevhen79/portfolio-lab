@@ -73,15 +73,56 @@ const loadStoredExclusions = (): string[] => {
   }
 };
 
+/** Persistence for the last unsaved portfolio + its request params.
+ *
+ *  iOS Safari / Chrome aggressively discard background tabs when the phone
+ *  screen locks — the page silently reloads when the user returns and any
+ *  in-memory state is gone. Re-running a 60-second optimisation just to see
+ *  the same result is awful UX. We mirror the most recent request + result
+ *  to localStorage with a 1-hour TTL so the page comes back the way the
+ *  user left it as long as the data is still fresh. */
+const SESSION_LS_KEY = "pl_last_session_v1";
+const SESSION_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+interface PersistedSession {
+  ts: number;
+  req: OptimizeRequest;
+  result: OptimizeResponse;
+}
+
+function loadPersistedSession(): PersistedSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_LS_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw) as PersistedSession;
+    if (!obj.ts || !obj.req || !obj.result) return null;
+    if (Date.now() - obj.ts > SESSION_TTL_MS) return null;
+    return obj;
+  } catch {
+    return null;
+  }
+}
+
 export default function PortfolioBuilder() {
-  const [req, setReq] = useState<OptimizeRequest>(() => ({
-    ...DEFAULT_REQ,
-    // Hydrate from localStorage on first mount so the user's permanent
-    // exclusion preferences (e.g. "always skip USDTRY/EURTRY") survive
-    // browser refresh.
-    exclude_symbols: loadStoredExclusions(),
-  }));
-  const [result, setResult] = useState<OptimizeResponse | null>(null);
+  // Pull persisted session ONCE on first mount. If valid + fresh, prefill
+  // both `req` and `result` so the user lands on their last portfolio
+  // instead of an empty form.
+  const persisted = typeof window !== "undefined" ? loadPersistedSession() : null;
+
+  const [req, setReq] = useState<OptimizeRequest>(() =>
+    persisted
+      ? { ...persisted.req, exclude_symbols: loadStoredExclusions() }
+      : {
+          ...DEFAULT_REQ,
+          // Hydrate from localStorage on first mount so the user's permanent
+          // exclusion preferences (e.g. "always skip USDTRY/EURTRY") survive
+          // browser refresh.
+          exclude_symbols: loadStoredExclusions(),
+        }
+  );
+  const [result, setResult] = useState<OptimizeResponse | null>(
+    persisted ? persisted.result : null,
+  );
   const [busy, setBusy] = useState(false);
   // Full error object (axios error or thrown). BuildErrorCard parses the
   // structured `{code, context}` shape from the backend; the `errorMessage`
@@ -229,6 +270,21 @@ export default function PortfolioBuilder() {
       /* quota or private-mode failure — fine to ignore, in-memory state still works */
     }
   }, [req.exclude_symbols]);
+
+  // Mirror the most recent (req, result) to localStorage so that a tab
+  // discard (iOS lock-screen!) or accidental refresh restores the user's
+  // last portfolio instead of dropping them on an empty form. We deliberately
+  // skip persisting while a request is in flight — partially-applied state
+  // would just confuse the next mount. 1-hour TTL keeps the data fresh.
+  useEffect(() => {
+    if (busy || !result) return;
+    try {
+      const payload: PersistedSession = { ts: Date.now(), req, result };
+      localStorage.setItem(SESSION_LS_KEY, JSON.stringify(payload));
+    } catch {
+      /* quota / private mode — ignore */
+    }
+  }, [result, req, busy]);
 
   // Controlled value of the "add exclusion" input.
   const [excludeInput, setExcludeInput] = useState("");
@@ -867,7 +923,19 @@ export default function PortfolioBuilder() {
                 sparsifyThreshold={req.sparsify_threshold}
                 minHistoryYears={req.min_history_years}
               />
-              <div className="card-glow p-6">
+              <div className="card-glow p-4 sm:p-6">
+                {displayResult.trace_id && (
+                  <div className="flex items-center justify-end mb-3 pb-3 border-b border-border">
+                    <button
+                      type="button"
+                      onClick={() => void portfoliosApi.downloadTrace(displayResult.trace_id!)}
+                      title={t.builder.trace_download_title}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-text-muted hover:text-cyan hover:border-cyan transition-colors"
+                    >
+                      <Save className="w-3.5 h-3.5" /> {t.builder.trace_download_label}
+                    </button>
+                  </div>
+                )}
                 <PortfolioMetrics data={displayResult} />
               </div>
 

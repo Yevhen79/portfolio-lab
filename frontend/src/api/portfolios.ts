@@ -79,6 +79,23 @@ export interface OptimizeResponse {
   cov_method: string;
   estimation_window_start: string;
   estimation_window_end: string;
+  /** Per-run pipeline trace id. Empty string if persistence failed. */
+  trace_id?: string;
+}
+
+export async function downloadTrace(traceId: string): Promise<void> {
+  const r = await api.get(`/optimize/trace/${encodeURIComponent(traceId)}`, {
+    responseType: "blob",
+  });
+  const blob = new Blob([r.data], { type: "text/markdown; charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `portfolio-trace-${traceId.slice(0, 8)}.md`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 export interface PortfolioListItem {

@@ -189,6 +189,8 @@ export const ru: Strings = {
     busy_title: "Строим портфель по полному каталогу Libertex...",
     busy_hint: "Первый запуск может занять 30–60 секунд (загрузка цен).",
     optimization_failed: "Оптимизация не удалась",
+    trace_download_label: "Трассировка",
+    trace_download_title: "Скачать трассировку построения портфеля (Markdown). Покажет какие активы прошли и какие были отсеяны на каждом этапе, с причинами.",
     asset_allocation: "Состав портфеля",
     aa_subtitle_filtered:
       "Показано {visible} активов — у ещё {hidden} вес был < 1%, они «слиты» в показанные",

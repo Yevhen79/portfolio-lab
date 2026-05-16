@@ -180,6 +180,8 @@ export const en = {
     busy_title: "Building portfolio across the full Libertex catalogue...",
     busy_hint: "First run can take 30-60s while prices download.",
     optimization_failed: "Optimization failed",
+    trace_download_label: "Trace",
+    trace_download_title: "Download the per-run pipeline trace (Markdown). Shows which assets passed and which were filtered out at each step, with reasons.",
     asset_allocation: "Asset Allocation",
     aa_subtitle_filtered:
       "{visible} assets shown — {hidden} more had weight < 1% and were merged into shown holdings",

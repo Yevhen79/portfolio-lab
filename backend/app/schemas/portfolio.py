@@ -109,6 +109,11 @@ class OptimizeResponse(BaseModel):
     cov_method: str
     estimation_window_start: str
     estimation_window_end: str
+    # Id of the per-run pipeline trace (Markdown file in backend/data/traces/).
+    # The frontend exposes a download link so the user can post-mortem how
+    # the optimiser arrived at this portfolio. Empty string if persistence
+    # failed (e.g. disk-full); the optimisation itself still works.
+    trace_id: str = ""
 
 
 class PortfolioCreate(BaseModel):

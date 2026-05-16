@@ -191,7 +191,7 @@ def compute_monthly_returns(
     # spikes) is dropped, not real growth stocks. Crypto allowed up to 1500%.
     # Price-ratio sanity is NOT enforced because legit growth stocks (AMZN, NVDA,
     # AAPL after 20y of splits) can have 100x+ ratios.
-    bad: list[str] = []
+    bad: list[tuple[str, str]] = []  # (column, reason)
     for col in list(returns.columns):
         col_returns = returns[col].dropna()
         if col_returns.empty:
@@ -199,14 +199,25 @@ def compute_monthly_returns(
         max_abs_ret = float(col_returns.abs().max())
         cap = 15.0 if is_crypto.get(col, False) else 3.0
         if max_abs_ret > cap:
-            bad.append(col)
-    if bad:
+            bad.append(
+                (
+                    col,
+                    f"месячный спайк {max_abs_ret * 100:.0f}% > порога "
+                    f"{cap * 100:.0f}% — повреждённые данные yfinance",
+                )
+            )
+    bad_cols = [c for c, _ in bad]
+    if bad_cols:
         logger.info(
             "Dropping %d assets with implausible price/return data: %s",
-            len(bad), ", ".join(bad[:10]) + ("..." if len(bad) > 10 else ""),
+            len(bad_cols), ", ".join(bad_cols[:10]) + ("..." if len(bad_cols) > 10 else ""),
         )
-        returns = returns.drop(columns=bad)
+        returns = returns.drop(columns=bad_cols)
 
+    # Stash the drop reasons on the DataFrame attrs so the engine's trace
+    # can read them without a second round of filtering. `df.attrs` survives
+    # column ops; downstream code already ignores attrs.
+    returns.attrs["plausibility_drops"] = bad
     return returns
 
 

@@ -1,6 +1,8 @@
 import logging
+import re
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_approved_user
@@ -15,6 +17,31 @@ logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/optimize", tags=["optimize"])
+
+
+@router.get("/trace/{trace_id}")
+def download_trace(
+    trace_id: str,
+    _: User = Depends(get_approved_user),
+):
+    """Download the per-run pipeline trace as a Markdown file.
+
+    The optimize endpoint writes one such file per successful run; the
+    response includes the `trace_id`. Restricted to authenticated users.
+    Path-validation prevents traversal (`../`) — only hex-uuid filenames
+    in the configured traces directory are served.
+    """
+    # Guard against path traversal — only 32-char hex IDs (uuid.hex format).
+    if not re.fullmatch(r"[0-9a-f]{32}", trace_id):
+        raise HTTPException(status_code=404, detail="Invalid trace id")
+    path = portfolio_engine.TRACES_DIR / f"{trace_id}.md"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Trace not found")
+    return FileResponse(
+        path,
+        media_type="text/markdown; charset=utf-8",
+        filename=f"portfolio-trace-{trace_id[:8]}.md",
+    )
 
 
 @router.post("", response_model=OptimizeResponse)
