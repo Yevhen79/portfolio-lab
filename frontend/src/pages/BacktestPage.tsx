@@ -175,10 +175,10 @@ export default function BacktestPage() {
               value={req.portfolio_type}
               onChange={(e) => update("portfolio_type", e.target.value as OptimizeRequest["portfolio_type"])}
             >
-              <option value="max_sharpe">{t.builder.opt_max_sharpe}</option>
-              <option value="min_variance">{t.builder.opt_min_var}</option>
-              <option value="target_return">{t.builder.opt_target_return}</option>
-              <option value="target_risk">{t.builder.opt_target_risk}</option>
+              <option value="max_sharpe">{t.builder.strategy_max_sharpe}</option>
+              <option value="min_variance">{t.builder.strategy_min_variance}</option>
+              <option value="target_return">{t.builder.strategy_target_return}</option>
+              <option value="target_risk">{t.builder.strategy_target_risk}</option>
             </select>
           </div>
 
@@ -202,7 +202,7 @@ export default function BacktestPage() {
         {req.portfolio_type === "target_return" && (
           <div className="mt-4">
             <label className="block text-xs uppercase tracking-wider text-text-muted mb-1.5">
-              {t.builder.target_return_label} (%)
+              {t.builder.strategy_target_return} (%)
             </label>
             <input
               type="number"
@@ -218,7 +218,7 @@ export default function BacktestPage() {
         {req.portfolio_type === "target_risk" && (
           <div className="mt-4">
             <label className="block text-xs uppercase tracking-wider text-text-muted mb-1.5">
-              {t.builder.target_risk_label} (%)
+              {t.builder.strategy_target_risk} (%)
             </label>
             <input
               type="number"
