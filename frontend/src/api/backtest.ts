@@ -4,8 +4,12 @@ import type { OptimizeRequest, OptimizeResponse } from "./portfolios";
 /** Backtest request shape = OptimizeRequest + required `as_of_date`. */
 export interface BacktestRequest extends OptimizeRequest {
   /** ISO YYYY-MM-DD. Must be in the past — optimiser sees data up to and
-   *  including this date, the realised window is the year that followed. */
+   *  including this date, the realised window starts the next month. */
   as_of_date: string;
+  /** ISO YYYY-MM-DD. End of the realised window. Defaults to
+   *  min(as_of + 12 months, today) when omitted. Must be after as_of and
+   *  not in the future. */
+  forward_end_date?: string | null;
 }
 
 export interface RealizedAssetReturn {

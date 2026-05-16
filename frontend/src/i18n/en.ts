@@ -379,22 +379,24 @@ export const en = {
   backtest: {
     page_title: "Backtest",
     page_subtitle:
-      "Pick a date in the past, optimise as if it were that day, then see what the portfolio actually delivered over the following year. Plan vs fact, side by side.",
-    form_title: "Backtest parameters",
-    form_subtitle:
-      "Same controls as the live builder, plus an as-of date. Everything else uses balanced defaults to keep the focus on the comparison.",
+      "Pick a date in the past, optimise as if it were that day, then see what the portfolio actually delivered. Plan vs fact, side by side, on the same controls as the live builder.",
+    dates_title: "Dates",
+    dates_subtitle: "When the portfolio is pretended to be built, and how far forward to measure the result.",
     help_title: "How backtest works",
     help_body_1:
-      "The optimiser only sees price history up to your chosen as-of date. No future data leaks into the universe-trimming or the optimisation, so the resulting portfolio is what you would actually have got that day.",
+      "The optimiser only sees price history up to your chosen as-of date. No future data leaks into universe-trimming or the optimisation, so the resulting portfolio is what you would actually have got that day.",
     help_body_2:
-      "Then we replay the same weights on the year that followed — through today, or 12 months forward if as-of is older than a year ago. Realised return, volatility, Sharpe and drawdown all use those forward returns.",
+      "Then we replay the same weights on the window (as-of, forward-end]. Realised return, volatility, Sharpe and drawdown all use those forward returns.",
     help_body_3:
       "S&P 500 over the same forward window is shown alongside so you can tell whether the optimisation beat passive.",
     as_of_label: "As-of date",
-    as_of_hint: "Optimiser sees data up to this day. Forward window starts the next month.",
-    strategy_label: "Strategy",
-    capital_label: "Initial capital (USD)",
-    categories_label: "Asset categories",
+    as_of_hint: "Optimiser sees data up to and including this day.",
+    forward_end_label: "Forward end",
+    forward_end_hint: "Where to stop measuring the realised result. Defaults to today.",
+    forward_today: "Today",
+    placeholder_title: "Pick dates and parameters, then run",
+    placeholder_body:
+      "Fill in the dates on the left, tweak any builder controls you'd normally use, and press Run. Plan and fact will appear here side by side.",
     run_button: "Run backtest",
     running: "Running…",
     summary_as_of: "As-of",

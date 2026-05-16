@@ -19,9 +19,21 @@ from app.schemas.portfolio import OptimizeRequest, OptimizeResponse
 
 
 class BacktestRequest(OptimizeRequest):
-    """Same shape as OptimizeRequest, but `as_of_date` is required here."""
+    """Same shape as OptimizeRequest, but `as_of_date` is required here.
+
+    `forward_end_date` lets the caller pick any future date (relative to
+    as_of) up to today for the "fact" side. Default is the lesser of
+    today and as_of + 12 months — preserving the original "year ahead"
+    UX while letting power users measure realised performance over any
+    horizon they care about (3 months for a tactical bet, 5 years for a
+    long-term allocation, etc.).
+    """
     as_of_date: str = Field(
         description="ISO 'YYYY-MM-DD'. Must be in the past — the optimiser sees data up to and including this date."
+    )
+    forward_end_date: Optional[str] = Field(
+        default=None,
+        description="ISO 'YYYY-MM-DD'. End of the realised window. Must be after as_of_date and not in the future. Defaults to min(as_of + 12 months, today).",
     )
 
 

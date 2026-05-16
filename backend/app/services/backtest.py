@@ -52,18 +52,29 @@ FORWARD_MONTHS = 12
 
 
 def run_backtest(db: Session, req: BacktestRequest) -> BacktestResponse:
-    """Build the as-of portfolio and evaluate its one-year realised path."""
+    """Build the as-of portfolio and evaluate its realised path."""
     as_of_dt = _parse_as_of(req.as_of_date)
     today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     if as_of_dt >= today:
         raise ValueError("as_of_date must be in the past")
 
+    # Forward-end: explicit override, or default = min(as_of + 12m, today).
+    if req.forward_end_date:
+        fwd_end_dt = _parse_as_of(req.forward_end_date)
+        if fwd_end_dt <= as_of_dt:
+            raise ValueError("forward_end_date must be after as_of_date")
+        # Clamp to today — we don't have future data, picking a date
+        # ahead of today would silently truncate. Better to be explicit.
+        if fwd_end_dt > today:
+            fwd_end_dt = today
+    else:
+        fwd_end_dt = min(as_of_dt + pd.DateOffset(months=FORWARD_MONTHS), today)
+
     # 1. Build the "plan" using only data up to as_of (full optimiser path).
     opt_req = _to_optimize_request(req, as_of_dt)
     plan: OptimizeResponse = build_portfolio(db, opt_req)
 
-    # 2. Forward window: from the month after as_of, up to today (or +12m).
-    fwd_end_dt = min(as_of_dt + pd.DateOffset(months=FORWARD_MONTHS), today)
+    # 2. Replay the held weights on the forward window we just resolved.
     realised = _compute_realized(
         db=db,
         plan=plan,
@@ -99,9 +110,10 @@ def _parse_as_of(s: str) -> datetime:
 def _to_optimize_request(req: BacktestRequest, as_of_dt: datetime) -> OptimizeRequest:
     """Translate BacktestRequest into the engine's OptimizeRequest."""
     data = req.model_dump()
-    # BacktestRequest carries every OptimizeRequest field plus as_of_date,
-    # so we can just round-trip it. Force the as_of to the parsed date in
-    # ISO form so the engine sees a normalised value.
+    # Strip BacktestRequest-only fields the engine doesn't accept.
+    data.pop("forward_end_date", None)
+    # Force the as_of to the parsed date in ISO form so the engine sees
+    # a normalised value (the schema is permissive on input format).
     data["as_of_date"] = as_of_dt.strftime("%Y-%m-%d")
     return OptimizeRequest(**data)
 
