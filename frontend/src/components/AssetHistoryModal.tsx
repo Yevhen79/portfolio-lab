@@ -12,12 +12,27 @@ interface Props {
   symbol: string | null;
   years: number;
   onClose: () => void;
+  /** Optional backtest overlay. When provided, the price line is rendered
+   *  in two colours: the segment up to `splitAtDate` matches what the
+   *  optimiser saw on the as-of date (plan side), and the segment after
+   *  is highlighted as "fact" — i.e. what actually happened. The boundary
+   *  is also marked with a dashed vertical line. `splitEndDate` clips the
+   *  fact segment so we don't keep showing data past the user-chosen
+   *  forward window end. */
+  splitAtDate?: string;
+  splitEndDate?: string;
 }
 
 /** Modal showing the historical price line for a single instrument over the
  *  current optimisation window. Opened when the user clicks a bar in the
  *  allocation chart. */
-export default function AssetHistoryModal({ symbol, years, onClose }: Props) {
+export default function AssetHistoryModal({
+  symbol,
+  years,
+  onClose,
+  splitAtDate,
+  splitEndDate,
+}: Props) {
   const t = useT();
   const [data, setData] = useState<AssetPriceHistory | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -64,23 +79,97 @@ export default function AssetHistoryModal({ symbol, years, onClose }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [symbol, onClose]);
 
+  /** Per-asset realised slice — only computed in backtest mode.
+   *
+   *  We anchor at the LAST close on or before `splitAtDate` so the boundary
+   *  matches the optimiser's view of "what price was available on the
+   *  as-of date" (the engine cropped using `≤ as_of`). The fact segment
+   *  starts from that anchor and runs through `splitEndDate` (clipped to
+   *  the end of data). Splits at the anchor are shared with the plan
+   *  trace so the line stays visually continuous. */
+  const split = useMemo(() => {
+    if (!data || !splitAtDate || data.points.length === 0) return null;
+    const cutoff = splitAtDate;
+    const endCutoff = splitEndDate ?? "9999-12-31";
+
+    // Plan segment = everything up to and including the last point on or
+    // before the as-of date. We use a string compare since ISO dates sort
+    // lexicographically.
+    let anchorIdx = -1;
+    for (let i = 0; i < data.points.length; i++) {
+      if (data.points[i].date <= cutoff) anchorIdx = i;
+      else break;
+    }
+    if (anchorIdx < 0) return null;
+
+    const planPoints = data.points.slice(0, anchorIdx + 1);
+    // Fact segment includes the anchor (so the line touches) and continues
+    // through points strictly after the cutoff but ≤ forward_end.
+    const factPoints = [data.points[anchorIdx]];
+    for (let i = anchorIdx + 1; i < data.points.length; i++) {
+      if (data.points[i].date <= endCutoff) factPoints.push(data.points[i]);
+      else break;
+    }
+    const anchorPrice = data.points[anchorIdx].close;
+    const factEnd = factPoints[factPoints.length - 1];
+    const factReturn = anchorPrice > 0 ? (factEnd.close / anchorPrice - 1) : null;
+    const planFirstPrice = data.points[0].close;
+    const planReturn = planFirstPrice > 0 ? (anchorPrice / planFirstPrice - 1) : null;
+    return {
+      planPoints,
+      factPoints,
+      anchorDate: data.points[anchorIdx].date,
+      anchorPrice,
+      factEndDate: factEnd.date,
+      factEndPrice: factEnd.close,
+      factReturn,
+      planReturn,
+    };
+  }, [data, splitAtDate, splitEndDate]);
+
   const plotData = useMemo(() => {
     if (!data) return null;
-    const xs = data.points.map((p) => p.date);
-    const ys = data.points.map((p) => p.close);
-    const color = categoryColor(data.category) || NEON.cyan;
+    const assetColor = categoryColor(data.category) || NEON.cyan;
+    const hoverFmt = "%{x|%b %Y}<br><b>%{y:,.2f}</b> " + (data.currency || "") + "<extra></extra>";
+
+    // Backtest mode: two traces in distinct colours, sharing the as-of
+    // anchor so the line reads as continuous.
+    if (split) {
+      return [
+        {
+          x: split.planPoints.map((p) => p.date),
+          y: split.planPoints.map((p) => p.close),
+          type: "scatter" as const,
+          mode: "lines" as const,
+          name: t.asset_modal.bt_plan_label,
+          line: { color: NEON.cyan, width: 2 },
+          hovertemplate: hoverFmt,
+        },
+        {
+          x: split.factPoints.map((p) => p.date),
+          y: split.factPoints.map((p) => p.close),
+          type: "scatter" as const,
+          mode: "lines" as const,
+          name: t.asset_modal.bt_fact_label,
+          line: { color: NEON.magenta, width: 2.5 },
+          hovertemplate: hoverFmt,
+        },
+      ];
+    }
+
+    // Default mode: single line in the asset's category colour.
     return [
       {
-        x: xs,
-        y: ys,
+        x: data.points.map((p) => p.date),
+        y: data.points.map((p) => p.close),
         type: "scatter" as const,
         mode: "lines" as const,
         name: data.symbol,
-        line: { color, width: 2 },
-        hovertemplate: "%{x|%b %Y}<br><b>%{y:,.2f}</b> " + (data.currency || "") + "<extra></extra>",
+        line: { color: assetColor, width: 2 },
+        hovertemplate: hoverFmt,
       },
     ];
-  }, [data]);
+  }, [data, split, t.asset_modal.bt_plan_label, t.asset_modal.bt_fact_label]);
 
   if (!symbol) return null;
 
@@ -158,6 +247,41 @@ export default function AssetHistoryModal({ symbol, years, onClose }: Props) {
                   // eat half the chart width. 50 px is enough for "1.00k"-ish
                   // tick labels.
                   margin: { l: window.innerWidth < 640 ? 50 : 70, r: 16, t: 10, b: 40 },
+                  // Backtest-mode shapes: a dashed vertical at the as-of
+                  // boundary so the eye lands on the plan/fact transition
+                  // even when colours are subtle on hi-DPI displays.
+                  shapes: split
+                    ? [
+                        {
+                          type: "line",
+                          xref: "x",
+                          yref: "paper",
+                          x0: split.anchorDate,
+                          x1: split.anchorDate,
+                          y0: 0,
+                          y1: 1,
+                          line: { color: NEON.muted, width: 1, dash: "dash" },
+                        },
+                      ]
+                    : undefined,
+                  annotations: split
+                    ? [
+                        {
+                          x: split.anchorDate,
+                          y: 1.02,
+                          xref: "x",
+                          yref: "paper",
+                          text: t.asset_modal.bt_as_of_marker,
+                          showarrow: false,
+                          font: { color: NEON.muted, size: 10 },
+                          xanchor: "left",
+                        },
+                      ]
+                    : undefined,
+                  legend: split
+                    ? { orientation: "h", x: 0, y: 1.12, font: { size: 11 } }
+                    : undefined,
+                  showlegend: !!split,
                   xaxis: {
                     ...PLOT_LAYOUT_DEFAULTS.xaxis,
                     type: "date",
@@ -172,14 +296,34 @@ export default function AssetHistoryModal({ symbol, years, onClose }: Props) {
                 config={PLOT_CONFIG}
                 style={{ width: "100%" }}
               />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-                <Stat label={t.asset_modal.first_close} value={fmtUSD(data.first_close, 2)} />
-                <Stat label={t.asset_modal.last_close} value={fmtUSD(data.last_close, 2)} />
-                <Stat label={t.asset_modal.total_return} value={fmtPct(data.total_return)}
-                  color={data.total_return >= 0 ? "positive" : "negative"} />
-                <Stat label={t.asset_modal.cagr} value={fmtPct(data.cagr)}
-                  color={data.cagr >= 0 ? "positive" : "negative"} />
-              </div>
+              {/* In backtest mode the bottom stats split into "plan window"
+                  (before as-of) and "realised" (after as-of) so the user
+                  can compare them at a glance with the rest of the page. */}
+              {split ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                  <Stat label={t.asset_modal.bt_anchor_price} value={fmtUSD(split.anchorPrice, 2)} />
+                  <Stat label={t.asset_modal.bt_end_price} value={fmtUSD(split.factEndPrice, 2)} />
+                  <Stat
+                    label={t.asset_modal.bt_plan_return}
+                    value={split.planReturn !== null ? fmtPct(split.planReturn) : "—"}
+                    color={split.planReturn !== null && split.planReturn >= 0 ? "positive" : "negative"}
+                  />
+                  <Stat
+                    label={t.asset_modal.bt_fact_return}
+                    value={split.factReturn !== null ? fmtPct(split.factReturn) : "—"}
+                    color={split.factReturn !== null && split.factReturn >= 0 ? "positive" : "negative"}
+                  />
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                  <Stat label={t.asset_modal.first_close} value={fmtUSD(data.first_close, 2)} />
+                  <Stat label={t.asset_modal.last_close} value={fmtUSD(data.last_close, 2)} />
+                  <Stat label={t.asset_modal.total_return} value={fmtPct(data.total_return)}
+                    color={data.total_return >= 0 ? "positive" : "negative"} />
+                  <Stat label={t.asset_modal.cagr} value={fmtPct(data.cagr)}
+                    color={data.cagr >= 0 ? "positive" : "negative"} />
+                </div>
+              )}
             </>
           )}
         </div>

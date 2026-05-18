@@ -458,6 +458,9 @@ export const en = {
     plan_structure_title: "Plan portfolio structure",
     plan_structure_subtitle:
       "The portfolio the optimiser produced using only data up to the as-of date.",
+    plan_structure_help_title: "Bar click → asset price history",
+    plan_structure_help_body:
+      "Click any bar to open the price history for that holding. In backtest mode the line is split in two colours — cyan shows the period the optimiser saw, magenta shows what actually happened after the as-of date. The dashed vertical marks the as-of boundary.",
   },
   metrics: {
     expected_return: "Expected Return (12m)",
@@ -649,5 +652,12 @@ export const en = {
     total_return: "Total return",
     cagr: "CAGR",
     click_hint: "Click any bar to see its price history.",
+    bt_plan_label: "Plan (data the optimiser saw)",
+    bt_fact_label: "Fact (after as-of date)",
+    bt_as_of_marker: "as-of",
+    bt_anchor_price: "Price at as-of",
+    bt_end_price: "Price at window end",
+    bt_plan_return: "Plan-window return",
+    bt_fact_return: "Realised return (fact)",
   },
 } as const;

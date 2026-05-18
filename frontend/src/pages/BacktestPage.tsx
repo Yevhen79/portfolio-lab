@@ -35,6 +35,7 @@ import type { BacktestRequest, BacktestResponse } from "../api/backtest";
 import * as portfoliosApi from "../api/portfolios";
 import type { OptimizeRequest } from "../api/portfolios";
 import AllocationTable from "../components/AllocationTable";
+import AssetHistoryModal from "../components/AssetHistoryModal";
 import BuildErrorCard from "../components/BuildErrorCard";
 import HelpTip from "../components/HelpTip";
 import OptimizeProgress from "../components/OptimizeProgress";
@@ -799,6 +800,10 @@ export default function BacktestPage() {
 function BacktestResults({ result }: { result: BacktestResponse }) {
   const t = useT();
   const { plan, realized, comparison } = result;
+  // The price-history modal is opened from the WeightsBar bar click.
+  // Storing `null` means the modal is closed; storing a ticker mounts the
+  // modal which fetches and renders that asset's history.
+  const [historySymbol, setHistorySymbol] = useState<string | null>(null);
 
   return (
     <div className="space-y-6">
@@ -886,12 +891,31 @@ function BacktestResults({ result }: { result: BacktestResponse }) {
         </Section>
       )}
 
-      <Section title={t.backtest.plan_structure_title} subtitle={t.backtest.plan_structure_subtitle}>
+      <Section
+        title={t.backtest.plan_structure_title}
+        subtitle={t.backtest.plan_structure_subtitle}
+        help={
+          <HelpTip title={t.backtest.plan_structure_help_title} width={340}>
+            {t.backtest.plan_structure_help_body}
+          </HelpTip>
+        }
+      >
         <div className="space-y-4">
-          <WeightsBar weights={plan.weights} />
+          <WeightsBar weights={plan.weights} onBarClick={setHistorySymbol} />
           <AllocationTable weights={plan.weights} />
         </div>
       </Section>
+
+      {/* Price-history modal — when symbol is set, renders the asset's
+          full history with the plan/fact colour split anchored on the
+          as-of and forward-end dates. Null = closed. */}
+      <AssetHistoryModal
+        symbol={historySymbol}
+        years={20}
+        onClose={() => setHistorySymbol(null)}
+        splitAtDate={result.as_of_date}
+        splitEndDate={result.forward_window_end}
+      />
     </div>
   );
 }

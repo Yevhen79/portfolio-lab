@@ -470,6 +470,9 @@ export const ru: Strings = {
     plan_structure_title: "Структура портфеля (план)",
     plan_structure_subtitle:
       "Портфель, который оптимизатор построил, видя только данные до as-of даты.",
+    plan_structure_help_title: "Клик по бару → история цены",
+    plan_structure_help_body:
+      "Клик по любому бару откроет историю цен этого актива. В режиме бектеста линия разбита на два цвета — циан показывает, что видел оптимизатор, маджента — что произошло после as-of даты. Пунктирная вертикаль отмечает as-of границу.",
   },
   metrics: {
     expected_return: "Ожидаемая доходность (12 мес)",
@@ -666,5 +669,12 @@ export const ru: Strings = {
     total_return: "Полная доходность",
     cagr: "CAGR",
     click_hint: "Клик по бару покажет историю цен инструмента.",
+    bt_plan_label: "План (что видел оптимизатор)",
+    bt_fact_label: "Факт (после as-of даты)",
+    bt_as_of_marker: "as-of",
+    bt_anchor_price: "Цена на as-of",
+    bt_end_price: "Цена на конец окна",
+    bt_plan_return: "Доходность за план-окно",
+    bt_fact_return: "Фактическая доходность",
   },
 };
