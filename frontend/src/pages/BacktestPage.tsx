@@ -20,6 +20,7 @@ import { useRef, useState } from "react";
 import {
   Ban,
   CalendarClock,
+  FileText,
   Loader2,
   Play,
   Plus,
@@ -31,6 +32,7 @@ import Plot from "react-plotly.js";
 
 import * as backtestApi from "../api/backtest";
 import type { BacktestRequest, BacktestResponse } from "../api/backtest";
+import * as portfoliosApi from "../api/portfolios";
 import type { OptimizeRequest } from "../api/portfolios";
 import AllocationTable from "../components/AllocationTable";
 import BuildErrorCard from "../components/BuildErrorCard";
@@ -801,15 +803,27 @@ function BacktestResults({ result }: { result: BacktestResponse }) {
   return (
     <div className="space-y-6">
       <div className="card p-4 sm:p-6 bg-gradient-to-r from-cyan/5 via-bg to-magenta/5 border-cyan/20">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <Stat label={t.backtest.summary_as_of} value={result.as_of_date} mono />
-          <Stat label={t.backtest.summary_forward_end} value={result.forward_window_end} mono />
-          <Stat label={t.backtest.summary_months} value={`${result.months_observed} ${t.backtest.months_unit}`} />
-          <Stat
-            label={t.backtest.summary_final}
-            value={realized ? fmtUSD(realized.final_value, 0) : "—"}
-            highlight={realized ? (realized.total_return >= 0 ? "positive" : "negative") : undefined}
-          />
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1">
+            <Stat label={t.backtest.summary_as_of} value={result.as_of_date} mono />
+            <Stat label={t.backtest.summary_forward_end} value={result.forward_window_end} mono />
+            <Stat label={t.backtest.summary_months} value={`${result.months_observed} ${t.backtest.months_unit}`} />
+            <Stat
+              label={t.backtest.summary_final}
+              value={realized ? fmtUSD(realized.final_value, 0) : "—"}
+              highlight={realized ? (realized.total_return >= 0 ? "positive" : "negative") : undefined}
+            />
+          </div>
+          {plan.trace_id && (
+            <button
+              type="button"
+              onClick={() => void portfoliosApi.downloadTrace(plan.trace_id!)}
+              title={t.builder.trace_download_title}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-text-muted hover:text-cyan hover:border-cyan transition-colors"
+            >
+              <FileText className="w-3.5 h-3.5" /> {t.builder.trace_download_label}
+            </button>
+          )}
         </div>
       </div>
 

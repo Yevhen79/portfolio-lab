@@ -39,7 +39,7 @@ from app.schemas.backtest import (
     RealizedComparison,
 )
 from app.services import data_loader as dl
-from app.services.portfolio_engine import build_portfolio
+from app.services.portfolio_engine import TRACES_DIR, build_portfolio
 
 
 logger = logging.getLogger(__name__)
@@ -89,6 +89,19 @@ def run_backtest(db: Session, req: BacktestRequest) -> BacktestResponse:
     # what the market delivered. We surface these as %-deltas to make the
     # "plan vs fact" story obvious in the UI.
     comparison = _build_comparison(plan, realised)
+
+    # 4. Append a "Fact" section to the trace markdown that build_portfolio
+    # already wrote to disk. This way the downloadable trace covers the
+    # entire backtest run (plan pipeline + realised metrics + per-asset
+    # plan-vs-fact table), not just the build pipeline.
+    if plan.trace_id and realised is not None:
+        _append_realised_to_trace(
+            plan.trace_id,
+            as_of=as_of_dt,
+            forward_end=fwd_end_dt,
+            realised=realised,
+            plan=plan,
+        )
 
     return BacktestResponse(
         as_of_date=as_of_dt.strftime("%Y-%m-%d"),
@@ -325,3 +338,124 @@ def _build_comparison(
         ),
     ]
     return RealizedComparison(rows=rows)
+
+
+def _pct(x: Optional[float]) -> str:
+    """Pretty-print an optional decimal fraction as a percentage."""
+    if x is None:
+        return "—"
+    return f"{x * 100:.2f}%"
+
+
+def _usd(x: Optional[float]) -> str:
+    if x is None:
+        return "—"
+    return f"${x:,.0f}"
+
+
+def _append_realised_to_trace(
+    trace_id: str,
+    as_of: datetime,
+    forward_end: datetime,
+    realised: RealizedMetrics,
+    plan: OptimizeResponse,
+) -> None:
+    """Append a 'Факт' (realised) section to the markdown trace on disk.
+
+    The trace file is written by `build_portfolio` and only describes the
+    pipeline that produced the plan. For the backtest we want one
+    downloadable document covering both halves — so we open the existing
+    file in append mode and tack on the realised metrics + per-asset
+    plan-vs-fact table. Failures here are non-fatal: the response still
+    carries the trace_id and the trace remains readable as a build-only
+    document.
+    """
+    path = TRACES_DIR / f"{trace_id}.md"
+    if not path.exists():
+        logger.warning("Trace %s not found, skipping realised append", trace_id)
+        return
+
+    lines: list[str] = ["", "---", "", "## Факт (realised)"]
+    lines.append("")
+    lines.append(
+        f"Веса портфеля, зафиксированные на as-of {as_of.strftime('%Y-%m-%d')}, "
+        f"прогнаны на forward-окне до {forward_end.strftime('%Y-%m-%d')}."
+    )
+    lines.append("")
+    lines.append("### Сводка")
+    lines.append("")
+    lines.append(f"- **Месяцев наблюдения**: {realised.months_observed}")
+    lines.append(f"- **Forward-окно**: `{realised.forward_start}` → `{realised.forward_end}`")
+    lines.append(f"- **Итоговая доходность (cumulative)**: {_pct(realised.total_return)}")
+    if realised.return_annual is not None:
+        lines.append(f"- **Доходность (год, арифм.)**: {_pct(realised.return_annual)}")
+    if realised.cagr_annual is not None:
+        lines.append(f"- **CAGR (геом.)**: {_pct(realised.cagr_annual)}")
+    if realised.volatility_annual is not None:
+        lines.append(f"- **Волатильность (год)**: {_pct(realised.volatility_annual)}")
+    if realised.sharpe_ratio is not None:
+        lines.append(f"- **Коэф. Шарпа (факт)**: {realised.sharpe_ratio:.3f}")
+    lines.append(f"- **Макс. просадка (факт)**: {_pct(realised.max_drawdown)}")
+    lines.append(f"- **Итоговая стоимость**: {_usd(realised.final_value)}")
+    if realised.benchmark_total_return is not None:
+        lines.append(
+            f"- **S&P 500 за то же окно**: {_pct(realised.benchmark_total_return)} "
+            f"(альфа портфеля: {_pct(realised.total_return - realised.benchmark_total_return)})"
+        )
+    lines.append("")
+
+    # Plan-vs-fact delta table at portfolio level
+    lines.append("### План vs Факт")
+    lines.append("")
+    lines.append("| Метрика | План | Факт | Δ |")
+    lines.append("|---|---:|---:|---:|")
+    rows: list[tuple[str, Optional[float], Optional[float], str]] = [
+        ("E[r] год", plan.expected_return_annual, realised.return_annual, "pct"),
+        ("CAGR", plan.cagr_annual, realised.cagr_annual, "pct"),
+        ("Волатильность год", plan.volatility_annual, realised.volatility_annual, "pct"),
+        ("Шарп", plan.sharpe_ratio, realised.sharpe_ratio, "ratio"),
+        ("Макс. просадка", -abs(plan.max_drawdown_estimate), realised.max_drawdown, "pct"),
+        (
+            "Итоговая стоимость",
+            plan.initial_capital * (1.0 + plan.expected_return_annual),
+            realised.final_value,
+            "usd",
+        ),
+    ]
+    for label, planned, actual, fmt in rows:
+        if fmt == "pct":
+            p_s = _pct(planned)
+            a_s = _pct(actual)
+            d_s = _pct((actual or 0) - (planned or 0)) if planned is not None and actual is not None else "—"
+        elif fmt == "usd":
+            p_s = _usd(planned)
+            a_s = _usd(actual)
+            d_s = _usd((actual or 0) - (planned or 0)) if planned is not None and actual is not None else "—"
+        else:
+            p_s = f"{planned:.2f}" if planned is not None else "—"
+            a_s = f"{actual:.2f}" if actual is not None else "—"
+            d_s = f"{actual - planned:+.2f}" if planned is not None and actual is not None else "—"
+        lines.append(f"| {label} | {p_s} | {a_s} | {d_s} |")
+    lines.append("")
+
+    # Per-asset plan-vs-fact (top 30 by weight to keep file size bounded)
+    if realised.per_asset:
+        lines.append("### По активам (план vs факт)")
+        lines.append("")
+        lines.append("| Тикер | Название | Вес | План E[r] | Факт | Δ |")
+        lines.append("|---|---|---:|---:|---:|---:|")
+        for a in realised.per_asset[:30]:
+            delta = a.realized_return - a.expected_return_annual
+            lines.append(
+                f"| `{a.symbol}` | {a.name} | {_pct(a.weight)} | "
+                f"{_pct(a.expected_return_annual)} | {_pct(a.realized_return)} | {_pct(delta)} |"
+            )
+        if len(realised.per_asset) > 30:
+            lines.append(f"\n…и ещё {len(realised.per_asset) - 30} позиций.")
+        lines.append("")
+
+    try:
+        with path.open("a", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+    except Exception as exc:
+        logger.warning("Failed to append realised section to trace %s: %s", trace_id, exc)
