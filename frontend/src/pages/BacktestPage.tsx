@@ -828,7 +828,22 @@ function BacktestResults({ result }: { result: BacktestResponse }) {
       </div>
 
       {realized && comparison.rows.length > 0 && (
-        <Section title={t.backtest.compare_title} subtitle={t.backtest.compare_subtitle}>
+        <Section
+          title={t.backtest.compare_title}
+          subtitle={t.backtest.compare_subtitle}
+          help={
+            <HelpTip title={t.backtest.compare_help_title} width={420}>
+              <p>{t.backtest.compare_help_p1}</p>
+              <p className="mt-2">{t.backtest.compare_help_p2}</p>
+              <ul className="mt-2 space-y-1 list-disc list-inside">
+                <li><b className="text-cyan">{t.backtest.compare_help_li_return}</b></li>
+                <li><b className="text-cyan">{t.backtest.compare_help_li_vol}</b></li>
+                <li><b className="text-cyan">{t.backtest.compare_help_li_dd}</b></li>
+              </ul>
+              <p className="mt-2 text-text-dim">{t.backtest.compare_help_p3}</p>
+            </HelpTip>
+          }
+        >
           <CompareTable rows={comparison.rows} />
           {realized.benchmark_total_return !== null && (
             <div className="mt-4 text-xs text-text-muted border-t border-border pt-3 flex flex-wrap items-center gap-3">
@@ -902,6 +917,33 @@ function Stat({
   );
 }
 
+/** Per-metric direction-of-improvement. For most metrics "higher is better"
+ *  (return / CAGR / Sharpe / final $). For volatility lower is better.
+ *  Max drawdown is stored as a negative number (e.g. -0.17), so a positive
+ *  delta (actual − plan) means the realised drawdown is LESS negative =
+ *  better outcome. We map each metric to its preferred direction so the
+ *  ✓/✗ colour reflects "was the realised result an improvement on the
+ *  plan?" rather than just "is the number bigger?". */
+type GoodDirection = "higher" | "lower" | "closer_to_zero";
+const METRIC_DIRECTION: Record<string, GoodDirection> = {
+  expected_return_annual: "higher",
+  cagr_annual: "higher",
+  sharpe_ratio: "higher",
+  final_value: "higher",
+  volatility_annual: "lower",
+  // DD values are negative; "closer to zero" = less severe drawdown = better.
+  // Equivalent to (actual − plan) > 0 since both inputs are ≤ 0.
+  max_drawdown: "closer_to_zero",
+};
+
+function isImprovement(metric: string, delta: number): boolean {
+  const dir = METRIC_DIRECTION[metric] ?? "higher";
+  if (dir === "lower") return delta < 0;
+  // For "closer_to_zero" with negative inputs, a positive delta means
+  // actual moved toward 0, so same as "higher is better".
+  return delta > 0;
+}
+
 function CompareTable({ rows }: { rows: backtestApi.ComparisonRow[] }) {
   const t = useT();
   function fmtVal(v: number | null, format: "pct" | "ratio" | "usd") {
@@ -921,6 +963,17 @@ function CompareTable({ rows }: { rows: backtestApi.ComparisonRow[] }) {
     };
     return map[key] ?? key;
   }
+  function metricTooltip(key: string): string | undefined {
+    const map: Record<string, string> = {
+      expected_return_annual: t.backtest.metric_return_annual_tip,
+      cagr_annual: t.backtest.metric_cagr_tip,
+      volatility_annual: t.backtest.metric_volatility_tip,
+      sharpe_ratio: t.backtest.metric_sharpe_tip,
+      max_drawdown: t.backtest.metric_drawdown_tip,
+      final_value: t.backtest.metric_final_value_tip,
+    };
+    return map[key];
+  }
   return (
     <div className="overflow-x-auto -mx-4 sm:mx-0 rounded-none sm:rounded-xl border-y sm:border border-border">
       <table className="w-full text-sm">
@@ -936,19 +989,29 @@ function CompareTable({ rows }: { rows: backtestApi.ComparisonRow[] }) {
           {rows.map((row) => {
             const delta =
               row.planned !== null && row.actual !== null ? row.actual - row.planned : null;
-            const isDrawdown = row.metric === "max_drawdown";
-            const positive = delta !== null && (isDrawdown ? delta > 0 : delta > 0);
-            const Arrow = delta === null ? null : positive ? TrendingUp : TrendingDown;
+            const better = delta !== null && isImprovement(row.metric, delta);
+            // Arrow direction shows the SIGN of the delta (which way the
+            // number moved), not whether it was an improvement — that's
+            // what the colour conveys.
+            const Arrow = delta === null ? null : delta > 0 ? TrendingUp : TrendingDown;
+            const tooltip = metricTooltip(row.metric);
             return (
               <tr key={row.metric} className="border-t border-border">
-                <td className="px-3 sm:px-4 py-3 text-text-muted">{metricLabel(row.metric)}</td>
+                <td
+                  className="px-3 sm:px-4 py-3 text-text-muted"
+                  title={tooltip}
+                >
+                  <span className={tooltip ? "decoration-text-dim/40 underline-offset-4 underline cursor-help" : undefined}>
+                    {metricLabel(row.metric)}
+                  </span>
+                </td>
                 <td className="px-3 sm:px-4 py-3 text-right font-mono">{fmtVal(row.planned, row.format)}</td>
                 <td className="px-3 sm:px-4 py-3 text-right font-mono font-semibold">{fmtVal(row.actual, row.format)}</td>
                 <td className="px-3 sm:px-4 py-3 text-right font-mono">
                   {delta === null ? (
                     <span className="text-text-dim">—</span>
                   ) : (
-                    <span className={`inline-flex items-center gap-1 ${positive ? "text-positive" : "text-negative"}`}>
+                    <span className={`inline-flex items-center gap-1 ${better ? "text-positive" : "text-negative"}`}>
                       {Arrow && <Arrow className="w-3.5 h-3.5" />}
                       {delta > 0 ? "+" : ""}
                       {fmtVal(delta, row.format)}

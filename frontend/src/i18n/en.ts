@@ -417,6 +417,31 @@ export const en = {
     metric_sharpe: "Sharpe ratio",
     metric_drawdown: "Max drawdown",
     metric_final_value: "Final value (USD)",
+    metric_return_annual_tip:
+      "Arithmetic mean of monthly returns × 12. The optimiser maximises this (when strategy = Max Sharpe). Higher = better.",
+    metric_cagr_tip:
+      "Geometric (compound) annual growth rate. For volatile mixes CAGR is meaningfully lower than the arithmetic mean — that gap is variance drag. Higher = better.",
+    metric_volatility_tip:
+      "Standard deviation of monthly returns × √12. Measures the TYPICAL fluctuation around the mean — symmetric, both up and down. Path-independent. Lower = better.",
+    metric_sharpe_tip:
+      "(Return − risk-free rate) / Volatility, annualised. The headline risk-adjusted score. Higher = better, >1 is good, >2 is exceptional.",
+    metric_drawdown_tip:
+      "Worst peak-to-trough decline ever observed in the historical replay. Path-dependent — depends on the order of returns. Different from volatility: even a low-σ portfolio can have a big drawdown if losses cluster. Closer to zero = better.",
+    metric_final_value_tip:
+      "Initial capital × (1 + total return). Plan value uses arithmetic E[r], fact value uses realised cumulative return. Higher = better.",
+    compare_help_title: "How to read the Plan vs Fact table",
+    compare_help_p1:
+      "Plan = what the optimiser would have predicted on the as-of date, using only data available then. Fact = what those exact weights actually delivered over the realised window.",
+    compare_help_p2:
+      "The Δ column is colour-coded by IMPROVEMENT, not by sign. Each metric has its own direction-of-good:",
+    compare_help_li_return:
+      "Return / CAGR / Sharpe / Final value — higher is better, so green when actual exceeds plan.",
+    compare_help_li_vol:
+      "Volatility — LOWER is better. A negative Δ (calmer than planned) shows green.",
+    compare_help_li_dd:
+      "Max drawdown — closer to zero is better (less severe trough). Both numbers are negative, so a positive Δ (e.g. -3% vs plan -17% = +14%) is green.",
+    compare_help_p3:
+      "Volatility and max drawdown measure different things — σ is the typical month-to-month spread, max DD is the worst cumulative peak-to-trough decline. DD is usually 1.5–2.5× σ on a multi-year window because losses can cluster.",
     benchmark_label: "Benchmark",
     benchmark_total: "S&P 500 over the same window:",
     benchmark_vs_portfolio: "Portfolio − benchmark:",
