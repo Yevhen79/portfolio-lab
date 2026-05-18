@@ -60,6 +60,10 @@ export interface OptimizeRequest {
    *  Set to 1.0 to disable. Backend default 0.60 catches names like
    *  ENPH-2024 (last ~$100 vs peak $329 = 68% below ATH). */
   max_drop_from_peak_pct?: number;
+  /** Restrict universe to MetaTrader-tradeable instruments only. After
+   *  dedup ~80 assets (mostly blue-chip stocks + popular crypto + a few
+   *  FX crosses). Default false = full Libertex CFD pool. */
+  mt_only?: boolean;
 }
 
 export interface OptimizeResponse {

@@ -635,17 +635,31 @@ export default function BacktestPage() {
                 <div className="flex justify-between text-[11px] text-text-muted mt-1">
                   <span>50</span><span>500</span><span>1500</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => update("max_assets_in_universe", 1500)}
-                  className={`mt-2 text-[11px] px-2 py-1 rounded-md border transition-colors ${
-                    req.max_assets_in_universe >= 1500
-                      ? "border-cyan bg-cyan/10 text-cyan"
-                      : "border-border text-text-muted hover:border-cyan hover:text-cyan"
-                  }`}
-                >
-                  {t.builder.universe_size_all}
-                </button>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => update("max_assets_in_universe", 1500)}
+                    className={`text-[11px] px-2 py-1 rounded-md border transition-colors ${
+                      req.max_assets_in_universe >= 1500
+                        ? "border-cyan bg-cyan/10 text-cyan"
+                        : "border-border text-text-muted hover:border-cyan hover:text-cyan"
+                    }`}
+                  >
+                    {t.builder.universe_size_all}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => update("mt_only", !req.mt_only)}
+                    title={t.builder.mt_only_help}
+                    className={`text-[11px] px-2 py-1 rounded-md border transition-colors ${
+                      req.mt_only
+                        ? "border-cyan bg-cyan/10 text-cyan"
+                        : "border-border text-text-muted hover:border-cyan hover:text-cyan"
+                    }`}
+                  >
+                    {t.builder.mt_only_label}
+                  </button>
+                </div>
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1.5">

@@ -54,6 +54,14 @@ class OptimizeRequest(BaseModel):
         le=1.0,
         description="Drop assets currently >X% below their peak. 0.60 = drop if last/peak < 0.40. Set to 1.0 to disable.",
     )
+    # Restrict the universe to instruments tradeable in MetaTrader 4 / 5
+    # (i.e. listed under MT4-Instant / MT4-Market / MT5-Instant on the
+    # Libertex catalogue). About 80 instruments after deduplication — much
+    # smaller than the full 1300+ Libertex CFD pool but enough for a
+    # well-formed Markowitz optimisation. Default off: most users want the
+    # full universe and only opt in when they specifically need MT
+    # coverage for their broker terminal.
+    mt_only: bool = False
     # Optional "as-of" date (ISO YYYY-MM-DD). When provided, the optimiser
     # only sees price history up to and including this date — used by the
     # backtest path to reproduce the portfolio that would have been built

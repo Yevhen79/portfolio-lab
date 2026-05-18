@@ -20,6 +20,14 @@ class Asset(Base):
     is_crypto: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
+    # True if any Libertex `MT4-Instant` / `MT4-Market` / `MT5-Instant`
+    # row in the catalogue covers this underlying (matched by yf_symbol so
+    # both the friendly-name row "Apple" AND its proper-ticker counterpart
+    # "AAPL" inherit the flag). Lets the user constrain the universe to
+    # instruments they can actually trade on MetaTrader, separate from the
+    # ~1300 Libertex-only CFDs. Populated by `backfill_mt_flag.py`.
+    is_mt: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     history_months: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     mean_monthly_return: Mapped[float | None] = mapped_column(Float, nullable=True)

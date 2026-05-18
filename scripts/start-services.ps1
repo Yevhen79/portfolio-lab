@@ -43,6 +43,23 @@ function Test-ProcessRunning([string]$name) {
     return $null -ne $proc
 }
 
+# CommandLine-based detection. Catches duplicate launchers that lost the
+# port-bind race (the loser sits idle but isn't visible via Test-PortListening
+# until the winner dies, then it grabs the port — which is how stale system
+# python uvicorn instances kept replacing the venv one on this box).
+function Test-CmdLineRunning {
+    param([string]$processName, [string[]]$needles)
+    $hits = Get-CimInstance Win32_Process -Filter "Name='$processName'" -ErrorAction SilentlyContinue |
+        Where-Object {
+            if (-not $_.CommandLine) { return $false }
+            foreach ($n in $needles) {
+                if ($_.CommandLine -like "*$n*") { return $true }
+            }
+            return $false
+        }
+    return $hits.Count -gt 0
+}
+
 # Resolve ngrok binary - winget install puts it under LOCALAPPDATA so
 # `ngrok` isn't on PATH for non-interactive scheduled tasks.
 $ngrokExe = $null
@@ -55,8 +72,10 @@ if ($cmd) {
 }
 
 # ---------- 1. Backend (uvicorn on :8000) ----------
-if (Test-PortListening 8000) {
-    Write-Output "[backend] already listening on 8000, skipping"
+$backendRunning = (Test-PortListening 8000) -or `
+    (Test-CmdLineRunning -processName "python.exe" -needles @("uvicorn","app.main:app"))
+if ($backendRunning) {
+    Write-Output "[backend] uvicorn already up (port or cmdline match), skipping"
 } else {
     $pyExe = Join-Path $root "backend\.venv\Scripts\python.exe"
     if (-not (Test-Path $pyExe)) {
@@ -75,8 +94,10 @@ if (Test-PortListening 8000) {
 }
 
 # ---------- 2. Frontend (Vite on :5173) ----------
-if (Test-PortListening 5173) {
-    Write-Output "[frontend] already listening on 5173, skipping"
+$frontendRunning = (Test-PortListening 5173) -or `
+    (Test-CmdLineRunning -processName "node.exe" -needles @("vite"))
+if ($frontendRunning) {
+    Write-Output "[frontend] Vite already up, skipping"
 } else {
     # npm on Windows is a .cmd shim - launch via cmd.exe so Start-Process
     # resolves it correctly even when the scheduled task has a stripped PATH.
