@@ -35,3 +35,6 @@ Thumbs.db
 # Misc
 *.log
 tunnel.log
+# Autostart script logs land here (see scripts/start-services.ps1)
+logs/
+ngrok.log
