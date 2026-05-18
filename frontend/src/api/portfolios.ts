@@ -55,6 +55,11 @@ export interface OptimizeRequest {
   /** Tickers to PULL OUT of the universe before optimisation. Matched
    *  case-insensitively against `Asset.symbol`. Backend default is []. */
   exclude_symbols?: string[];
+  /** "Drop from peak" filter — exclude assets currently more than X
+   *  fraction below their historical peak. 0.60 = drop if last/peak < 0.40.
+   *  Set to 1.0 to disable. Backend default 0.60 catches names like
+   *  ENPH-2024 (last ~$100 vs peak $329 = 68% below ATH). */
+  max_drop_from_peak_pct?: number;
 }
 
 export interface OptimizeResponse {

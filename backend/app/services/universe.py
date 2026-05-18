@@ -109,6 +109,7 @@ def assemble_returns(
     exclude_symbols: Optional[List[str]] = None,
     trace: Optional[BuildTrace] = None,
     as_of_date: Optional[datetime] = None,
+    max_drop_from_peak_pct: float = 0.60,
 ) -> Tuple[pd.DataFrame, List[Asset]]:
     """Return (monthly_returns_df, list_of_assets_in_order_of_columns).
 
@@ -187,7 +188,7 @@ def assemble_returns(
         )
 
     if trace is not None:
-        kept_now = [_label(asset_by_yf[k]) for k in asset_by_yf]
+        kept_now = [_label(asset_by_yf[k]) for k in asset_by_yf if k in prices_by_symbol]
         trace.add_step(
             name="Загрузка цен с yfinance",
             kept=kept_now,
@@ -201,6 +202,71 @@ def assemble_returns(
             note="Дропаются активы, торгующиеся ниже 25% от исторического максимума, "
                  "если этот максимум был > 24 месяцев назад (regulatory casualties, "
                  "post-bubble crypto, и т.д.).",
+        )
+
+    # "Currently in a deep drawdown" filter. Catches names like ENPH in 2025
+    # (last ~$100 vs peak $329 = 68% below peak) that the optimiser would
+    # otherwise pick on the basis of positive average historical return.
+    # User's mental model: assets should visually trend bottom-left to
+    # top-right. We approximate that by requiring the latest close to be
+    # within `(1 - threshold)` of the historical peak inside the window.
+    # Threshold = 1.0 disables the filter.
+    drop_from_peak_drops: list[tuple[str, str, str]] = []
+    if max_drop_from_peak_pct < 1.0 and prices_by_symbol:
+        to_drop: list[str] = []
+        for yf_sym, df in prices_by_symbol.items():
+            try:
+                prices = df["close"].dropna()
+                # Need at least a year of data for a meaningful peak.
+                if len(prices) < 12:
+                    continue
+                peak = float(prices.max())
+                last = float(prices.iloc[-1])
+                if peak <= 0:
+                    continue
+                drop_pct = 1.0 - last / peak
+                if drop_pct > max_drop_from_peak_pct:
+                    a = asset_by_yf.get(yf_sym)
+                    if a is None:
+                        continue
+                    peak_ts = prices.idxmax()
+                    months_since_peak = max(
+                        1, int((prices.index[-1] - peak_ts).days // 30)
+                    )
+                    drop_from_peak_drops.append(
+                        (
+                            a.symbol,
+                            a.name or a.symbol,
+                            f"сейчас на {drop_pct * 100:.0f}% ниже пика "
+                            f"(${last:.2f} vs пик ${peak:.2f} {months_since_peak} мес. назад) — "
+                            f"порог фильтра «drop from peak» = {max_drop_from_peak_pct * 100:.0f}%",
+                        )
+                    )
+                    to_drop.append(yf_sym)
+            except Exception:
+                # A malformed series shouldn't kill the run.
+                pass
+        for yf_sym in to_drop:
+            prices_by_symbol.pop(yf_sym, None)
+            is_crypto_map.pop(yf_sym, None)
+
+    if drop_from_peak_drops:
+        logger.info(
+            "Drop-from-peak filter dropped %d assets (threshold %.0f%%)",
+            len(drop_from_peak_drops),
+            max_drop_from_peak_pct * 100,
+        )
+
+    if trace is not None:
+        kept_now = [_label(asset_by_yf[k]) for k in prices_by_symbol if k in asset_by_yf]
+        trace.add_step(
+            name=f"Фильтр «drop from peak» (≤ {max_drop_from_peak_pct * 100:.0f}%)",
+            kept=kept_now,
+            dropped=drop_from_peak_drops,
+            note="Дропаем активы, сейчас торгующиеся слишком глубоко под своим "
+                 "историческим максимумом — соответствует визуальному критерию "
+                 "«трендовый актив», без затянувшихся коррекций. Порог "
+                 "настраивается в разделе «Расширенно» / можно выключить (1.0).",
         )
 
     if not prices_by_symbol:

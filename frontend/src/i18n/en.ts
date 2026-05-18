@@ -170,6 +170,11 @@ export const en = {
     max_weight_help_title: "Per-asset concentration cap",
     max_weight_help_body:
       "Hard cap on how much capital any single asset can absorb. Default 35% guarantees at minimum 3 non-zero positions and prevents the degenerate '100% in one stock' outcomes Markowitz otherwise produces at the corners of the feasibility region (high target_risk on a small pool, etc.). Drag the slider right to relax — at 100% the constraint is off and the optimiser may concentrate freely. If the requested target_return / target_risk is unreachable WITH the cap, we automatically fall back to the unconstrained solve and log a warning.",
+    drop_from_peak_label: "Max drop from peak",
+    drop_from_peak_off: "off",
+    drop_from_peak_help_title: "Filter out names stuck in a deep drawdown",
+    drop_from_peak_help_body:
+      "Drops any asset whose latest close is more than this fraction below its historical peak inside the analysis window. Default 60% catches names like ENPH-2024 (last ~$100 vs peak $329 = 68% below ATH) that the optimiser would otherwise pick on the basis of positive average historical return. Slider right to relax — at 100% the filter is off. Does NOT penalise assets that crashed but fully recovered (NVDA-2002, AMZN-2001 are both currently near ATH and pass the filter). Catches: 'recently in a deep hole and hasn't bounced back yet'. Misses: 'historically extremely volatile but now fine'.",
     universe_size_help_title: "How many instruments to analyse",
     universe_size_help_body:
       "Hard cap on how many instruments reach the optimiser. The catalogue holds ~1,500 mapped Libertex tickers, but the actual asset pool passed to Markowitz is smaller after these sequential filters: (1) category & exclusions; (2) yfinance availability; (3) data-quality (drops series with implausible monthly spikes — broken yfinance unit shifts); (4) min-history filter (the biggest cut — newer crypto and recent IPOs get dropped); (5) negative-mean filter (assets that lost money on average historically are out); (6) THIS cap — ranks survivors by μ/σ (Sharpe-like) and keeps the top N. Click \"All available\" to skip the μ/σ ranking step entirely.",

@@ -79,6 +79,7 @@ function defaultRequest(asOf: string, fwdEnd: string): BacktestRequest {
     sparsify_threshold: 0.01,
     max_weight_per_asset: 0.35,
     apply_swaps: false,
+    max_drop_from_peak_pct: 0.60,
     max_assets_in_universe: 500,
     categories: [...ALL_CATEGORIES],
     exclude_symbols: [],
@@ -671,6 +672,33 @@ export default function BacktestPage() {
                 />
                 <div className="flex justify-between text-[11px] text-text-muted mt-1">
                   <span>10%</span><span>35%</span><span>{t.builder.max_weight_off}</span>
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs uppercase tracking-wide text-text-muted inline-flex items-center">
+                    {t.builder.drop_from_peak_label}
+                    <HelpTip title={t.builder.drop_from_peak_help_title} width={380}>
+                      {t.builder.drop_from_peak_help_body}
+                    </HelpTip>
+                  </label>
+                  <span className="font-mono text-cyan">
+                    {(req.max_drop_from_peak_pct ?? 0.60) >= 1.0
+                      ? t.builder.drop_from_peak_off
+                      : fmtPct(req.max_drop_from_peak_pct ?? 0.60)}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0.30}
+                  max={1.00}
+                  step={0.05}
+                  value={req.max_drop_from_peak_pct ?? 0.60}
+                  onChange={(e) => update("max_drop_from_peak_pct", Number(e.target.value))}
+                  className="w-full accent-cyan"
+                />
+                <div className="flex justify-between text-[11px] text-text-muted mt-1">
+                  <span>30%</span><span>60%</span><span>{t.builder.drop_from_peak_off}</span>
                 </div>
               </div>
               <div>

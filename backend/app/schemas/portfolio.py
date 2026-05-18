@@ -41,6 +41,19 @@ class OptimizeRequest(BaseModel):
     # history / negative-mean filters, so it doesn't affect the rest of the
     # universe's composition.
     exclude_symbols: List[str] = Field(default_factory=list)
+    # "Currently in a deep drawdown" filter — drops any asset whose latest
+    # close is more than this fraction below its historical peak inside the
+    # analysis window. The threshold matches the user's mental model of
+    # "asset moving from bottom-left to top-right": we don't want names like
+    # ENPH-2025 (last ~$100 vs peak $329 = 68% below ATH) in the universe
+    # even if their average historical return is still positive. Set to 1.0
+    # to disable the filter entirely. 0.60 means "drop if last/peak < 0.40".
+    max_drop_from_peak_pct: float = Field(
+        default=0.60,
+        ge=0.0,
+        le=1.0,
+        description="Drop assets currently >X% below their peak. 0.60 = drop if last/peak < 0.40. Set to 1.0 to disable.",
+    )
     # Optional "as-of" date (ISO YYYY-MM-DD). When provided, the optimiser
     # only sees price history up to and including this date — used by the
     # backtest path to reproduce the portfolio that would have been built

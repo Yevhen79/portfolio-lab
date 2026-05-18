@@ -72,6 +72,10 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
             "Sparsify": req.sparsify,
             "Sparsify ≥": req.sparsify_threshold,
             "Макс. вес одного актива": req.max_weight_per_asset,
+            "Макс. drop от пика": (
+                "выкл" if req.max_drop_from_peak_pct >= 1.0
+                else f"{req.max_drop_from_peak_pct * 100:.0f}%"
+            ),
             "Инструментов для анализа (cap)": max_assets,
             "Категории": req.categories or [],
             "Исключения": req.exclude_symbols or [],
@@ -89,6 +93,7 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
         exclude_symbols=req.exclude_symbols,
         trace=trace,
         as_of_date=as_of_dt,
+        max_drop_from_peak_pct=req.max_drop_from_peak_pct,
     )
     if returns.empty or len(assets) < 5:
         raise PortfolioBuildError(
