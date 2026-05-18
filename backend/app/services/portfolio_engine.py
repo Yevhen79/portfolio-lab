@@ -143,6 +143,60 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
                 swap_count, swap_median_annual,
             )
 
+        # Re-apply the negative-mean filter on the POST-swap returns. The
+        # universe-level filter ran on raw historical returns, but after
+        # subtracting a hefty daily holding fee (~-11% annual for US stocks,
+        # ~-25% for crypto) many previously-positive series flip to net
+        # negative — and min_variance would happily pick those for being
+        # "low vol". Drop them so the optimiser only sees instruments that
+        # are still expected to make money AFTER swap costs.
+        if swap_count > 0:
+            before = set(returns.columns)
+            monthly_means = returns.mean(skipna=True)
+            keep_cols = monthly_means[monthly_means > 0].index
+            returns = returns[keep_cols]
+            dropped_post_swap = before - set(returns.columns)
+            if dropped_post_swap:
+                logger.info(
+                    "Post-swap negative-mean filter dropped %d assets",
+                    len(dropped_post_swap),
+                )
+                if trace is not None:
+                    drop_rows = []
+                    for col in dropped_post_swap:
+                        a = asset_by_yf.get(col)
+                        if a is None:
+                            continue
+                        net_annual = float(monthly_means.get(col, 0.0)) * 12.0
+                        drop_rows.append((
+                            a.symbol,
+                            a.name or a.symbol,
+                            f"после вычитания свопа (~{a.swap_buy_daily * 365 * 100:.1f}%/год) "
+                            f"средняя стала {net_annual * 100:.2f}%/год - убыточный держатель",
+                        ))
+                    kept_now = [
+                        (asset_by_yf[c].symbol, asset_by_yf[c].name or asset_by_yf[c].symbol)
+                        for c in returns.columns if c in asset_by_yf
+                    ]
+                    trace.add_step(
+                        name="Фильтр после-своповой убыточности",
+                        kept=kept_now,
+                        dropped=drop_rows,
+                        note="Активы, у которых после вычитания overnight swap-комиссии "
+                             "средняя месячная стала <= 0, выкидываются. Иначе min-variance "
+                             "охотно берёт их за низкую σ, и план получается с отрицательной "
+                             "доходностью.",
+                    )
+
+        if returns.shape[1] < 5:
+            raise PortfolioBuildError(
+                "ALL_NEGATIVE_AFTER_SWAPS",
+                {
+                    "n_assets": int(returns.shape[1]),
+                    "swap_median_annual_pct": float(swap_median_annual),
+                },
+            )
+
     # 2. Parameter estimation (monthly) — cov_method clamped by deployment mode
     mu_m, sigma_m, columns = opt.estimate_mu_sigma(returns, method=cov_method)
     ordered_assets = [asset_by_yf[c] for c in columns]
@@ -322,6 +376,27 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
     sortino = M.sortino_ratio_annual(weights, returns, rf_annual)
     var_cvar = M.var_cvar_annual(weights, sigma_m, mu_m, alpha=0.05)
     max_dd = M.historical_max_drawdown(weights, returns)
+
+    # Guard-rail: refuse to deliver a portfolio with non-positive expected
+    # return. By construction this shouldn't happen — every survivor of
+    # filter_negative_mean (and its post-swap counterpart above) has μ > 0,
+    # and long-only weights summing to 1 give a convex combination of
+    # positive numbers. But target_return with an infeasibly low target,
+    # heavy swap costs eating into a thin positive universe, or weird
+    # numerical edge cases CAN produce ret_a <= 0. In that case the
+    # "optimal" portfolio is "lose money as slowly as possible" — clearly
+    # not what the user wants to act on. Surface a clear error instead.
+    if ret_a <= 0:
+        raise PortfolioBuildError(
+            "NEGATIVE_EXPECTED_RETURN",
+            {
+                "expected_return_annual": float(ret_a),
+                "n_assets": int((np.abs(weights) > 0.005).sum()),
+                "portfolio_type": req.portfolio_type,
+                "apply_swaps": bool(req.apply_swaps),
+                "swap_median_annual_pct": float(swap_median_annual),
+            },
+        )
 
     # Bug-fix #3: geometric (CAGR) annual return as sanity check. For
     # variance-heavy assets (VIX, levered ETFs, crypto on short history)

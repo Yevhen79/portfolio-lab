@@ -90,8 +90,11 @@ export default function BuildErrorCard({ error, onRetry }: Props) {
   const entry = messages[code] || messages.GENERIC;
 
   // Interpolate context numbers into the body where placeholders exist.
+  // `target` covers both target_return/target_risk legacy strings AND the
+  // realised E[r] of a NEGATIVE_EXPECTED_RETURN failure (the value the
+  // optimiser ended up producing, not what the user asked for).
   const body = tpl(entry.body, {
-    target: pct(ctx.target),
+    target: pct(ctx.target ?? ctx.expected_return_annual),
     max_available: pct(ctx.max_available),
     min_achievable: pct(ctx.min_achievable),
     n_assets: ctx.n_assets ?? 0,

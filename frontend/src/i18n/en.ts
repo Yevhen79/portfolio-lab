@@ -591,6 +591,27 @@ export const en = {
         body: "{raw}",
         tips: ["Try again in a few seconds — this is usually transient (yfinance rate-limit)"],
       },
+      NEGATIVE_EXPECTED_RETURN: {
+        title: "The chosen settings produce a money-losing portfolio",
+        body:
+          "The optimiser found a feasible weight allocation, but its expected annual return is {target} — non-positive. Building a portfolio that promises to lose money on average makes no investment sense, so we refuse to deliver it.",
+        tips: [
+          "Turn OFF \"Apply Libertex swap costs\" — overnight fees can flip an otherwise profitable mix into a net loss, especially for Min Variance which doesn't care about return",
+          "Switch strategy to Max Sharpe instead of Min Variance — it explicitly maximises return-per-risk, so the result is rarely negative",
+          "Widen the universe: enable more categories (Stocks, ETF, etc.) or raise \"Instruments for analysis\"",
+          "Push the as-of date forward — the older the window, the more weight 2008 / 2022 drawdowns get and the harder it is to find consistently positive assets",
+        ],
+      },
+      ALL_NEGATIVE_AFTER_SWAPS: {
+        title: "Almost every asset becomes unprofitable after Libertex swaps",
+        body:
+          "After subtracting overnight swap costs from each instrument's historical return, only {n_assets} assets are still expected to make money. That's not enough for a Markowitz optimisation (need ≥ 5).",
+        tips: [
+          "Turn OFF \"Apply Libertex swap costs\" if you only want the academic, swap-free view",
+          "Enable more asset categories — crypto and forex have much smaller swap costs than the default leverage on stocks",
+          "Reconsider whether long-only CFD holding makes sense on this universe — typical Libertex stock swap is ~-11%/year and only the best performers clear that hurdle",
+        ],
+      },
       GENERIC: {
         title: "Portfolio could not be built",
         body: "{raw}",
