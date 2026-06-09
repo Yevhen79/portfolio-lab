@@ -27,7 +27,7 @@ if not exist frontend\node_modules (
 REM ---------- Backend ----------
 if not "%ONLY%"=="frontend" (
     echo Starting FastAPI backend on http://localhost:8000 ...
-    start "Portfolio Lab — Backend" cmd /k "cd /d %~dp0backend && call .venv\Scripts\activate.bat && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    start "Portfolio Lab — Backend" cmd /k "cd /d %~dp0backend && call .venv\Scripts\activate.bat && uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload"
 )
 
 REM ---------- Frontend ----------

@@ -39,6 +39,12 @@ class User(Base):
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
+    # Monotonic token generation counter. Embedded as the `tv` claim in every
+    # issued JWT; get_current_user rejects tokens whose `tv` != this value.
+    # Bumping it (on logout or password change) instantly invalidates every
+    # outstanding token for the user — cheap revocation without a blocklist.
+    token_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
     @property
     def is_admin(self) -> bool:
         return self.role == UserRole.ADMIN.value

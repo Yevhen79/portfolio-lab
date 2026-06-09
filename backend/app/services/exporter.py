@@ -1,8 +1,20 @@
 """PDF / Excel export of portfolios."""
 from __future__ import annotations
 
+from html import escape
 from io import BytesIO
 from typing import Any, Dict
+
+
+def _excel_safe(value: Any) -> Any:
+    """Neutralize spreadsheet formula injection. A cell whose text starts with
+    = + - @ (or a leading tab/CR) is interpreted as a formula by Excel/Sheets;
+    a malicious asset name like '=HYPERLINK(...)' could exfiltrate data when
+    the user opens the export. Prefix such strings with a single quote so they
+    render as literal text."""
+    if isinstance(value, str) and value and value[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + value
+    return value
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -38,10 +50,10 @@ def export_excel(portfolio: Any) -> bytes:
     row = 1
     row = write_header(row, "Portfolio Lab — Markowitz Portfolio Report")
     ws.cell(row=row, column=1, value="Name").font = metric_font
-    ws.cell(row=row, column=2, value=portfolio.name)
+    ws.cell(row=row, column=2, value=_excel_safe(portfolio.name))
     row += 1
     ws.cell(row=row, column=1, value="Type").font = metric_font
-    ws.cell(row=row, column=2, value=portfolio.portfolio_type)
+    ws.cell(row=row, column=2, value=_excel_safe(portfolio.portfolio_type))
     row += 1
     ws.cell(row=row, column=1, value="Initial Capital").font = metric_font
     ws.cell(row=row, column=2, value=f"${portfolio.initial_capital:,.2f}")
@@ -78,9 +90,9 @@ def export_excel(portfolio: Any) -> bytes:
     row += 1
     weights = portfolio.weights or []
     for w in weights:
-        ws.cell(row=row, column=1, value=w["symbol"])
-        ws.cell(row=row, column=2, value=w["name"])
-        ws.cell(row=row, column=3, value=w["category"])
+        ws.cell(row=row, column=1, value=_excel_safe(w["symbol"]))
+        ws.cell(row=row, column=2, value=_excel_safe(w["name"]))
+        ws.cell(row=row, column=3, value=_excel_safe(w["category"]))
         ws.cell(row=row, column=4, value=f"{w['weight']*100:.2f}%")
         ws.cell(row=row, column=5, value=f"${w['amount_usd']:,.2f}")
         row += 1
@@ -112,10 +124,14 @@ def export_pdf(portfolio: Any) -> bytes:
 
     story = []
     story.append(Paragraph("Portfolio Lab", title))
-    story.append(Paragraph(f"<b>{portfolio.name}</b>", styles["Heading2"]))
+    # escape() user-controlled text — reportlab's Paragraph parses a mini-HTML
+    # markup, so an unescaped portfolio name like "<b onclick=...>" or a raw
+    # "&" would corrupt the document or inject markup. Numeric/internal fields
+    # are safe to interpolate directly.
+    story.append(Paragraph(f"<b>{escape(str(portfolio.name))}</b>", styles["Heading2"]))
     story.append(Paragraph(
-        f"Portfolio type: <b>{portfolio.portfolio_type}</b> | "
-        f"Created: {portfolio.created_at} | "
+        f"Portfolio type: <b>{escape(str(portfolio.portfolio_type))}</b> | "
+        f"Created: {escape(str(portfolio.created_at))} | "
         f"Initial capital: <b>${portfolio.initial_capital:,.2f}</b>",
         body,
     ))

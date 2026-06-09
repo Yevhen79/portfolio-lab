@@ -40,7 +40,7 @@ class OptimizeRequest(BaseModel):
     # list = no exclusions. Applied AFTER category filtering but BEFORE
     # history / negative-mean filters, so it doesn't affect the rest of the
     # universe's composition.
-    exclude_symbols: List[str] = Field(default_factory=list)
+    exclude_symbols: List[str] = Field(default_factory=list, max_length=500)
     # "Currently in a deep drawdown" filter — drops any asset whose latest
     # close is more than this fraction below its historical peak inside the
     # analysis window. The threshold matches the user's mental model of

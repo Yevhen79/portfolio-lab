@@ -24,7 +24,7 @@ if [ "$ONLY" != "frontend" ]; then
   python -m pip install --upgrade pip -q
   python -m pip install -r requirements.txt -q
   python seed.py
-  uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload &
+  uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload &
   BACKEND_PID=$!
   cd ..
 fi

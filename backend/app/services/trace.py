@@ -149,3 +149,25 @@ class BuildTrace:
             logger.warning("Failed to save trace %s: %s", path, exc)
             return ""
         return trace_id
+
+
+def set_trace_owner(traces_dir: Path, trace_id: str, user_id: int) -> None:
+    """Record which user owns a trace, so the download endpoint can enforce
+    access. Stored as a tiny sidecar `{trace_id}.owner` next to the markdown.
+    Best-effort: a failed write just means the trace stays owner-less and
+    only admins can fetch it (download_owner_id returns None)."""
+    if not trace_id:
+        return
+    try:
+        (traces_dir / f"{trace_id}.owner").write_text(str(int(user_id)), encoding="utf-8")
+    except Exception as exc:
+        logger.warning("Failed to write trace owner for %s: %s", trace_id, exc)
+
+
+def get_trace_owner(traces_dir: Path, trace_id: str) -> int | None:
+    """Return the owning user id for a trace, or None if unknown."""
+    try:
+        raw = (traces_dir / f"{trace_id}.owner").read_text(encoding="utf-8").strip()
+        return int(raw)
+    except Exception:
+        return None

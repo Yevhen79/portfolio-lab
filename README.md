@@ -90,9 +90,11 @@ start.bat
 1. Opens 3 windows: FastAPI on `:8000`, Vite on `:5173`, Cloudflare Tunnel.
 2. The tunnel window prints a public `*.trycloudflare.com` URL after a few seconds — share that with anyone.
 
-Open `http://localhost:5173` (or the trycloudflare URL). Default admin:
-- email: `evgenij.shakotko@gmail.com`
-- password: `12345`
+Open `http://localhost:5173` (or your tunnel URL). The admin account is
+created from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in your **gitignored** `backend/.env`
+on first `seed.py`. Set a real email and a strong (16+ char) password there —
+the app refuses to start with placeholder values. **Never commit real
+credentials or document them here.**
 
 Other users register via the form; the admin must approve them before they can save portfolios.
 

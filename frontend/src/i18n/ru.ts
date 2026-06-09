@@ -27,6 +27,7 @@ export const ru: Strings = {
     email: "Email",
     name: "Имя",
     password: "Пароль",
+    password_hint: "Минимум 12 символов: заглавная, строчная и цифра",
     sign_in: "Войти",
     signing_in: "Вход...",
     create_account: "Зарегистрироваться",

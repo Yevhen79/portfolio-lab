@@ -41,6 +41,25 @@ export async function me(): Promise<MeResponse> {
   return r.data;
 }
 
+/** Server-side logout: bumps the user's token_version so the current token
+ *  (and any other device's) stops validating immediately. Best-effort — the
+ *  client clears local state regardless of the response. */
+export async function logout(): Promise<void> {
+  try {
+    await api.post("/auth/logout");
+  } catch {
+    /* token may already be invalid; local cleanup happens in the store */
+  }
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<{ access_token: string }> {
+  const r = await api.post("/auth/change-password", {
+    current_password: currentPassword,
+    new_password: newPassword,
+  });
+  return r.data;
+}
+
 export async function requestQuota(amount: number, reason?: string) {
   const r = await api.post("/me/quota-request", { requested_amount: amount, reason });
   return r.data;

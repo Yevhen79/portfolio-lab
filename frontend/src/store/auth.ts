@@ -46,6 +46,10 @@ export const useAuth = create<AuthState>((set) => ({
     }
   },
   logout: () => {
+    // Fire-and-forget server-side revocation (bumps token_version) so the
+    // token can't be replayed even if it was captured. Local state is
+    // cleared immediately regardless of the network result.
+    void authApi.logout();
     localStorage.removeItem("pl_token");
     set({ token: null, user: null });
   },

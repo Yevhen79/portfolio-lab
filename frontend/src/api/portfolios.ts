@@ -179,12 +179,6 @@ export async function deletePortfolio(id: number) {
   await api.delete(`/portfolios/${id}`);
 }
 
-export function downloadExcel(id: number) {
-  const token = localStorage.getItem("pl_token");
-  window.open(`/api/export/portfolio/${id}/excel?_t=${Date.now()}`, "_blank");
-  void token;
-}
-
 export async function downloadFile(id: number, kind: "pdf" | "excel") {
   const r = await api.get(`/export/portfolio/${id}/${kind}`, { responseType: "blob" });
   const blob = new Blob([r.data], {

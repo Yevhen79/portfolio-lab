@@ -24,6 +24,20 @@ def get_current_user(
     user = db.get(User, user_id)
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+
+    # Blocked accounts lose access immediately, regardless of a still-valid
+    # token. (Admin block sets status=BLOCKED; without this check a blocked
+    # user kept full access until their token expired.)
+    if user.status == UserStatus.BLOCKED.value:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account blocked")
+
+    # Token revocation: the `tv` claim must match the user's current
+    # token_version. Logout / password-change bump token_version, which
+    # invalidates every token issued before the bump. Tokens minted before
+    # this feature shipped carry no `tv` and are treated as version 0.
+    token_tv = payload.get("tv", 0)
+    if int(token_tv) != int(user.token_version or 0):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token revoked")
     return user
 
 

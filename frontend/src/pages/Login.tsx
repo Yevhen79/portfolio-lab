@@ -10,7 +10,7 @@ import { useAuth } from "../store/auth";
 
 export default function Login() {
   const t = useT();
-  const [email, setEmail] = useState("evgenij.shakotko@gmail.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -30,21 +30,63 @@ configure_logging()
 logger = logging.getLogger(__name__)
 
 
+def _migrate_schema() -> None:
+    """Lightweight additive migrations for columns added after the DB was
+    first created (SQLAlchemy's create_all never ALTERs existing tables).
+    Idempotent: each ADD COLUMN is guarded by a PRAGMA existence check."""
+    from sqlalchemy import text
+
+    additions = {
+        "users": [("token_version", "INTEGER NOT NULL DEFAULT 0")],
+    }
+    try:
+        with engine.begin() as conn:
+            for table, cols in additions.items():
+                existing = {
+                    row[1] for row in conn.execute(text(f"PRAGMA table_info({table})"))
+                }
+                for col, ddl in cols:
+                    if col not in existing:
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}"))
+                        logger.info("Schema migration: added %s.%s", table, col)
+    except Exception as exc:
+        logger.warning("Schema migration check failed: %s", exc)
+
+
 def create_app() -> FastAPI:
+    # Interactive docs are gated behind ENABLE_DOCS (default off) so the
+    # OpenAPI schema isn't public on an internet-facing deploy.
+    docs_url = "/docs" if settings.ENABLE_DOCS else None
+    redoc_url = "/redoc" if settings.ENABLE_DOCS else None
+    openapi_url = "/openapi.json" if settings.ENABLE_DOCS else None
+
     app = FastAPI(
         title="Portfolio Lab API",
         description="Markowitz mean-variance portfolio optimization with full analytics.",
         version="1.0.0",
+        docs_url=docs_url,
+        redoc_url=redoc_url,
+        openapi_url=openapi_url,
     )
+
+    # Hardening headers on every response.
+    from app.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
+    app.add_middleware(SecurityHeadersMiddleware)
+    # Per-IP sliding-window rate limiting (auth brute-force + compute DoS).
+    app.add_middleware(RateLimitMiddleware)
+
+    # CORS: explicit origins only, never a wildcard alongside credentials.
+    # Methods/headers are scoped to what the SPA actually uses.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins_list + ["*"],
+        allow_origins=settings.cors_origins_list,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
     )
 
     Base.metadata.create_all(bind=engine)
+    _migrate_schema()
 
     app.include_router(config_route.router, prefix="/api")
     app.include_router(auth.router, prefix="/api")

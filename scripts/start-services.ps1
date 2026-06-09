@@ -81,7 +81,10 @@ if ($backendRunning) {
     if (-not (Test-Path $pyExe)) {
         Write-Output "[backend] ERROR: venv python not found at $pyExe"
     } else {
-        $args = @("-m","uvicorn","app.main:app","--host","0.0.0.0","--port","8000","--reload")
+        # Bind to localhost only — ngrok and the Vite proxy both reach the
+        # backend via 127.0.0.1 on this host, so it never needs to listen on
+        # 0.0.0.0 (which would expose it to the whole LAN in cleartext).
+        $args = @("-m","uvicorn","app.main:app","--host","127.0.0.1","--port","8000","--reload")
         $logPath = Join-Path $logDir "uvicorn.log"
         Start-Process -FilePath $pyExe `
             -ArgumentList $args `

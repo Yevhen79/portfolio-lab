@@ -10,6 +10,8 @@ clock — see CLAUDE-style decision documented in services docstring.
 from __future__ import annotations
 
 import logging
+import re
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
@@ -27,10 +29,30 @@ logger = logging.getLogger(__name__)
 CACHE_DIR = Path(settings.PRICES_CACHE_DIR)
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
+# Hard ceiling on a single yfinance download. yfinance has no native timeout,
+# so we run it in a worker thread and abandon it past this many seconds —
+# otherwise one hung HTTP call blocks the request for the whole 5-min axios
+# window and ties up the worker (DoS).
+_YF_TIMEOUT_SEC = 20
+_yf_pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="yf")
+
+# Cache filenames must be a strict whitelist so a crafted symbol can never
+# escape CACHE_DIR via path components.
+_SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]")
+
 
 def _cache_path(symbol: str, frequency: str) -> Path:
-    safe = symbol.replace("/", "_").replace(":", "_").replace("=", "_").replace("^", "_")
-    return CACHE_DIR / f"{safe}__{frequency}.parquet"
+    # Whitelist-sanitize: collapse anything outside [A-Za-z0-9._-] to '_',
+    # strip path separators / traversal, then assert the resolved path stays
+    # inside CACHE_DIR (defence-in-depth against path traversal).
+    safe = _SAFE_NAME_RE.sub("_", str(symbol))
+    safe = safe.replace("..", "_").strip("._") or "asset"
+    freq = _SAFE_NAME_RE.sub("_", str(frequency)) or "1mo"
+    path = (CACHE_DIR / f"{safe}__{freq}.parquet").resolve()
+    cache_root = CACHE_DIR.resolve()
+    if not str(path).startswith(str(cache_root)):
+        raise ValueError(f"unsafe cache path for symbol {symbol!r}")
+    return path
 
 
 # Default cache freshness window. Monthly bars don't update intra-month and
@@ -97,8 +119,9 @@ def fetch_yfinance(
 
     end = datetime.now()
     start = end - timedelta(days=years * 365)
-    try:
-        df = yf.download(
+
+    def _download():
+        return yf.download(
             symbol,
             start=start.strftime("%Y-%m-%d"),
             end=end.strftime("%Y-%m-%d"),
@@ -107,6 +130,15 @@ def fetch_yfinance(
             auto_adjust=True,
             threads=False,
         )
+
+    try:
+        # Bound the network call so a hung yfinance request can't pin the
+        # worker for the full HTTP timeout. The orphaned thread finishes on
+        # its own; we just stop waiting on it.
+        df = _yf_pool.submit(_download).result(timeout=_YF_TIMEOUT_SEC)
+    except FuturesTimeout:
+        logger.warning("yfinance timed out for %s after %ds", symbol, _YF_TIMEOUT_SEC)
+        df = None
     except Exception as exc:
         logger.warning("yfinance failed for %s: %s", symbol, exc)
         df = None
@@ -277,7 +309,15 @@ def fetch_risk_free_annual() -> float:
     if df is None or df.empty:
         return 0.04
     last = float(df["close"].iloc[-1])
-    return float(last / 100.0)
+    rf = last / 100.0
+    # Sanity-bound: a corrupt/misparsed ^TNX print (e.g. a stray 0 or a
+    # decimal-shift) must not feed an absurd risk-free rate into every Sharpe
+    # ratio. Real 10Y yields sit roughly in 0–10%; clamp generously and fall
+    # back to the default on anything implausible.
+    if not (0.0 <= rf <= 0.25):
+        logger.warning("Risk-free rate %.4f out of bounds; using 0.04 default", rf)
+        return 0.04
+    return float(rf)
 
 
 def fetch_benchmark_returns(

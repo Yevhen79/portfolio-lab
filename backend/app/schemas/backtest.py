@@ -11,11 +11,28 @@ adds a `realized` block with what actually happened, and a flat
 """
 from __future__ import annotations
 
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.portfolio import OptimizeRequest, OptimizeResponse
+
+
+def _validate_iso_date(v: Optional[str]) -> Optional[str]:
+    """Reject malformed or out-of-range dates at the API boundary so the
+    engine never sees a garbage value. Accepts None (optional fields)."""
+    if v is None or v == "":
+        return v
+    try:
+        d = datetime.fromisoformat(v).date()
+    except (TypeError, ValueError):
+        raise ValueError("date must be ISO format YYYY-MM-DD")
+    if d.year < 1950:
+        raise ValueError("date is implausibly far in the past (before 1950)")
+    if d > date.today():
+        raise ValueError("date cannot be in the future")
+    return v
 
 
 class BacktestRequest(OptimizeRequest):
@@ -35,6 +52,11 @@ class BacktestRequest(OptimizeRequest):
         default=None,
         description="ISO 'YYYY-MM-DD'. End of the realised window. Must be after as_of_date and not in the future. Defaults to min(as_of + 12 months, today).",
     )
+
+    @field_validator("as_of_date", "forward_end_date")
+    @classmethod
+    def _dates_in_range(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_iso_date(v)
 
 
 class RealizedAssetReturn(BaseModel):

@@ -68,7 +68,7 @@ export default function Register() {
           </div>
           <div>
             <label className="block text-xs uppercase tracking-wide text-text-muted mb-1.5">{t.auth.password}</label>
-            <input type="password" required minLength={4} className="input" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <input type="password" required minLength={12} className="input" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t.auth.password_hint} />
           </div>
 
           {error && (

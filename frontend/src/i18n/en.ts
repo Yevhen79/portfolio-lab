@@ -25,6 +25,7 @@ export const en = {
     email: "Email",
     name: "Display Name",
     password: "Password",
+    password_hint: "Min 12 chars, with upper, lower & a digit",
     sign_in: "Sign In",
     signing_in: "Signing in...",
     create_account: "Create Account",
