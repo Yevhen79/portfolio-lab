@@ -4,6 +4,7 @@ applies filters, returns a clean returns DataFrame ready for optimization.
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
@@ -146,11 +147,33 @@ def assemble_returns(
 
     yfinance_misses: list[tuple[str, str, str]] = []
     structural_drops: list[tuple[str, str, str]] = []
-    for a in assets:
+
+    # Fetch all price series CONCURRENTLY. This is the dominant cost of a
+    # build — on a 500-asset universe a sequential loop took ~95s (parquet
+    # reads + the handful of stale assets each doing a bounded network
+    # fetch one-at-a-time), which on a cold cache blew past the 5-min
+    # client timeout. A bounded thread pool collapses that to wall-clock
+    # ≈ slowest-single-fetch. The fetch is I/O-bound (disk + network) so
+    # threads parallelise it well despite the GIL.
+    def _fetch(a: Asset):
         interval = "1wk" if a.is_crypto else "1mo"
-        df = dl.fetch_yfinance(
-            a.yf_symbol, interval=interval, years=history_years, as_of_date=as_of_date,
-        )
+        try:
+            df = dl.fetch_yfinance(
+                a.yf_symbol, interval=interval, years=history_years, as_of_date=as_of_date,
+            )
+        except Exception as exc:  # defensive: one bad symbol can't kill the run
+            logger.warning("fetch failed for %s: %s", a.yf_symbol, exc)
+            df = None
+        return a, df
+
+    max_workers = min(16, max(4, len(assets)))
+    fetched: list[tuple[Asset, Optional[pd.DataFrame]]] = []
+    with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="univ-fetch") as pool:
+        fetched = list(pool.map(_fetch, assets))
+
+    # Filtering is CPU-only — run it sequentially over the fetched results so
+    # the kept-order is deterministic and the trace reads cleanly.
+    for a, df in fetched:
         if df is None or df.empty:
             yfinance_misses.append((a.symbol, a.name or a.symbol, "yfinance не вернул данных (вероятно делистинг)"))
             continue
