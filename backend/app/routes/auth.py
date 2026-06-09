@@ -1,6 +1,8 @@
-from datetime import datetime
+import uuid
+from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -10,13 +12,63 @@ from app.auth.security import (
     verify_password,
     verify_password_constant_time,
 )
+from app.config import settings
 from app.database import get_db
-from app.models import AuditLog, User, UserRole, UserStatus
+from app.middleware import client_ip
+from app.models import AuditLog, RegistrationLog, User, UserRole, UserStatus
 from app.schemas import LoginRequest, RegisterRequest, TokenResponse
 from app.schemas.auth import ChangePasswordRequest
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# httpOnly cookie that durably identifies a browser for the per-device
+# registration cap. Bypassable (incognito / clearing cookies), which is why
+# the per-IP cap is the hard backstop — this just raises the effort.
+_DEVICE_COOKIE = "pl_device"
+_DEVICE_COOKIE_MAX_AGE = 400 * 24 * 3600  # ~400 days
+
+
+def _registration_anti_spam(request: Request, db: Session) -> tuple[str, str, bool]:
+    """Enforce per-IP and per-device sign-up caps within the rolling window.
+    Returns (ip, device_id, is_new_device). Raises 429 when a cap is hit."""
+    ip = client_ip(request)
+    device_id = request.cookies.get(_DEVICE_COOKIE)
+    is_new_device = not device_id
+    if is_new_device:
+        device_id = uuid.uuid4().hex
+
+    window_start = datetime.utcnow() - timedelta(days=settings.REG_WINDOW_DAYS)
+
+    ip_count = int(
+        db.query(func.count(RegistrationLog.id))
+        .filter(RegistrationLog.ip == ip, RegistrationLog.created_at >= window_start)
+        .scalar()
+        or 0
+    )
+    if ip_count >= settings.REG_MAX_PER_IP:
+        raise HTTPException(
+            status_code=429,
+            detail="Registration limit reached for your network. Try again later.",
+        )
+
+    if not is_new_device:
+        device_count = int(
+            db.query(func.count(RegistrationLog.id))
+            .filter(
+                RegistrationLog.device_id == device_id,
+                RegistrationLog.created_at >= window_start,
+            )
+            .scalar()
+            or 0
+        )
+        if device_count >= settings.REG_MAX_PER_DEVICE:
+            raise HTTPException(
+                status_code=429,
+                detail="Registration limit reached for this device. Try again later.",
+            )
+
+    return ip, device_id, is_new_device
 
 
 def _issue_token(user: User) -> str:
@@ -29,7 +81,15 @@ def _issue_token(user: User) -> str:
 
 
 @router.post("/register", response_model=TokenResponse)
-def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenResponse:
+def register(
+    payload: RegisterRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> TokenResponse:
+    # Anti-spam caps first (cheap, and a blocked attempt must not create a row).
+    ip, device_id, is_new_device = _registration_anti_spam(request, db)
+
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
         # Generic message — do NOT reveal whether the email is already taken
@@ -40,24 +100,38 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenRe
             detail="Registration could not be completed. Try a different email.",
         )
 
+    # Self-service: auto-approve (configurable) with default day/week quotas.
+    auto = settings.AUTO_APPROVE_REGISTRATIONS
     user = User(
         email=payload.email,
         name=payload.name,
         password_hash=hash_password(payload.password),
         role=UserRole.USER.value,
-        status=UserStatus.PENDING.value,
-        daily_limit=5,
+        status=UserStatus.APPROVED.value if auto else UserStatus.PENDING.value,
+        daily_limit=settings.NEW_USER_DAILY_LIMIT,
+        weekly_limit=settings.NEW_USER_WEEKLY_LIMIT,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
-    db.add(AuditLog(user_id=user.id, action="register", detail=payload.email))
+    # Record the sign-up for the anti-spam counters + audit trail.
+    db.add(RegistrationLog(ip=ip, device_id=device_id, email=payload.email))
+    db.add(AuditLog(user_id=user.id, action="register", detail=f"{payload.email} ip={ip}"))
     db.commit()
 
-    # Pending users get a token so the UI can show the "awaiting approval"
-    # state and let them hit /me; every sensitive endpoint is gated by
-    # get_approved_user, so the token grants nothing actionable until an
-    # admin approves them.
+    # Persist the device id so the per-device cap recognises this browser on
+    # future sign-up attempts. httpOnly + Secure + SameSite=Lax.
+    if is_new_device:
+        response.set_cookie(
+            _DEVICE_COOKIE,
+            device_id,
+            max_age=_DEVICE_COOKIE_MAX_AGE,
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            path="/",
+        )
+
     token = _issue_token(user)
     return TokenResponse(
         access_token=token,

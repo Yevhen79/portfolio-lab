@@ -38,12 +38,17 @@ _RULES: list[tuple[str, Tuple[int, int]]] = [
 _GLOBAL_RULE: Tuple[int, int] = (300, 60)     # 300 req / min per IP
 
 
-def _client_ip(request: Request) -> str:
-    # ngrok / reverse proxies put the real client first in X-Forwarded-For.
+def client_ip(request: Request) -> str:
+    """Best-effort real client IP. ngrok / reverse proxies put the real
+    client first in X-Forwarded-For; fall back to the socket peer."""
     xff = request.headers.get("x-forwarded-for")
     if xff:
         return xff.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
+
+
+# Backwards-compatible private alias used within this module.
+_client_ip = client_ip
 
 
 def _rule_for(path: str) -> Tuple[int, int]:

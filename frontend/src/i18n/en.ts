@@ -19,9 +19,9 @@ export const en = {
     login_subtitle: "Sign in to access your optimized portfolios.",
     register_title: "Create account",
     register_subtitle:
-      "Your access will require approval by an administrator before you can save portfolios.",
+      "Create your account and start building portfolios right away — no approval needed.",
     quota_info:
-      "By default new users have a daily quota of 5 saved portfolios. The admin can adjust this per user.",
+      "New accounts get 5 portfolio generations per day and 15 per week. Need more? Ask the admin.",
     email: "Email",
     name: "Display Name",
     password: "Password",

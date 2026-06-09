@@ -80,6 +80,23 @@ class Settings(BaseSettings):
     DEFAULT_DAILY_LIMIT: int = 5
     DEFAULT_WEEKLY_LIMIT: Optional[int] = None
 
+    # --- Self-service registration ---------------------------------------
+    # When true, new sign-ups are auto-approved (no admin gate) and get the
+    # default quotas below. Flip to false to restore the manual-approval flow.
+    AUTO_APPROVE_REGISTRATIONS: bool = True
+    NEW_USER_DAILY_LIMIT: int = 5
+    NEW_USER_WEEKLY_LIMIT: int = 15
+
+    # Anti-abuse caps on the public /register endpoint. A successful sign-up
+    # is logged with its source IP + a device cookie; a new attempt is
+    # rejected once either count reaches the cap within the rolling window.
+    # The IP cap is the hard backstop (a spammer can clear the device cookie
+    # but not trivially change IP); the device cap stops casual same-browser
+    # spam. Tune via .env if a shared NAT needs more headroom.
+    REG_MAX_PER_IP: int = 2
+    REG_MAX_PER_DEVICE: int = 2
+    REG_WINDOW_DAYS: int = 7
+
     PRICES_CACHE_DIR: str = str(BACKEND_ROOT / "data" / "prices")
     EXPORTS_DIR: str = str(BACKEND_ROOT / "data" / "exports")
     BACKUPS_DIR: str = str(BACKEND_ROOT / "data" / "backups")

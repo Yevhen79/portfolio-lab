@@ -1,7 +1,7 @@
 from app.models.user import User, UserStatus, UserRole
 from app.models.portfolio import Portfolio, PortfolioType
 from app.models.asset import Asset
-from app.models.audit import AuditLog, GenerationLog, QuotaRequest, QuotaRequestStatus
+from app.models.audit import AuditLog, GenerationLog, QuotaRequest, QuotaRequestStatus, RegistrationLog
 
 __all__ = [
     "User",
@@ -14,4 +14,5 @@ __all__ = [
     "GenerationLog",
     "QuotaRequest",
     "QuotaRequestStatus",
+    "RegistrationLog",
 ]

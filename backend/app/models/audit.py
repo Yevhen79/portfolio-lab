@@ -32,6 +32,19 @@ class GenerationLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 
 
+class RegistrationLog(Base):
+    """One row per successful sign-up, used by the anti-abuse caps on the
+    public /register endpoint. We count rows by `ip` and by `device_id`
+    within a rolling window to throttle mass account creation."""
+    __tablename__ = "registration_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ip: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    device_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
 class QuotaRequest(Base):
     __tablename__ = "quota_requests"
 
