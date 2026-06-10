@@ -1,46 +1,72 @@
 # Install Portfolio Lab autostart for the current user.
 #
-# Drops a shortcut into the user's Startup folder that runs
-# start-services.ps1 at every login. Idempotent - re-running it overwrites
-# the existing shortcut. Does NOT require admin privileges (uses the
-# per-user Startup folder, not the all-users one).
+# Sets up TWO independent triggers that both launch the watchdog
+# (scripts/watchdog.ps1), which then keeps backend + frontend + ngrok alive
+# forever and self-heals dropped ngrok tunnels. The watchdog is a singleton,
+# so having two triggers is harmless redundancy:
 #
-# Run ONCE, interactively, from any PowerShell. After that, every reboot
-# (or wake-from-locked) will bring backend + frontend + ngrok back up
-# automatically - no manual steps.
+#   1. A per-user Scheduled Task at logon (more reliable than the Startup
+#      folder; survives more edge cases, runs with a short delay so the
+#      network is up before ngrok dials). No admin required — it runs only
+#      when the user is logged on.
+#   2. A shortcut in the Startup folder (belt-and-suspenders fallback).
 #
-# To remove later, delete:
-#   %APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\PortfolioLab.lnk
+# Run ONCE, interactively, from any PowerShell. Re-running updates both.
 
 $ErrorActionPreference = "Stop"
 
-$script = Join-Path $PSScriptRoot "start-services.ps1"
-if (-not (Test-Path $script)) {
-    throw "start-services.ps1 not found next to this script ($script)"
+$watchdog = Join-Path $PSScriptRoot "watchdog.ps1"
+if (-not (Test-Path $watchdog)) {
+    throw "watchdog.ps1 not found next to this script ($watchdog)"
 }
 
-# Per-user Startup folder - Windows runs everything in here at login.
+$psArgs = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$watchdog`""
+
+# ---------- 1. Scheduled Task at logon ----------
+$taskName = "PortfolioLabWatchdog"
+$taskOk = $false
+try {
+    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $psArgs
+    $trigger = New-ScheduledTaskTrigger -AtLogOn
+    # 30s delay so Wi-Fi / Ethernet is up before ngrok tries to connect.
+    $trigger.Delay = "PT30S"
+    $settings = New-ScheduledTaskSettingsSet `
+        -AllowStartIfOnBatteries `
+        -DontStopIfGoingOnBatteries `
+        -StartWhenAvailable `
+        -ExecutionTimeLimit ([TimeSpan]::Zero) `
+        -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
+    # Run only when this user is logged on -> no admin / no stored password.
+    $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive
+    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger `
+        -Settings $settings -Principal $principal -Force | Out-Null
+    $taskOk = $true
+    Write-Output "Scheduled Task '$taskName' registered (logon trigger, 30s delay)."
+} catch {
+    Write-Output "Could not register Scheduled Task ($($_.Exception.Message))."
+    Write-Output "Falling back to the Startup-folder shortcut only."
+}
+
+# ---------- 2. Startup-folder shortcut (fallback) ----------
 $startupDir = [Environment]::GetFolderPath("Startup")
 $shortcutPath = Join-Path $startupDir "PortfolioLab.lnk"
-
-# We point the shortcut at powershell.exe with -WindowStyle Hidden so
-# users don't see a console flash every time they log in. The script
-# itself handles its own logging via Start-Process redirects.
 $shell = New-Object -ComObject WScript.Shell
 $sc = $shell.CreateShortcut($shortcutPath)
 $sc.TargetPath = "powershell.exe"
-$sc.Arguments = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$script`""
-$sc.WorkingDirectory = Split-Path -Parent $script
-$sc.Description = "Portfolio Lab - start backend, frontend, ngrok at login"
-$sc.WindowStyle = 7   # 7 = minimised (matches -WindowStyle Hidden intent)
+$sc.Arguments = $psArgs
+$sc.WorkingDirectory = Split-Path -Parent $watchdog
+$sc.Description = "Portfolio Lab watchdog - keeps backend, frontend, ngrok alive"
+$sc.WindowStyle = 7
 $sc.Save()
+Write-Output "Startup shortcut installed: $shortcutPath"
 
-Write-Output "Installed autostart shortcut:"
-Write-Output "  $shortcutPath"
 Write-Output ""
-Write-Output "Target: powershell.exe $($sc.Arguments)"
+Write-Output "Done. After every logon the watchdog launches and keeps all three"
+Write-Output "services up, restarting any that die (including dropped ngrok tunnels)."
 Write-Output ""
-Write-Output "To test without rebooting, run start-services.ps1 directly."
+Write-Output "Start it now without rebooting:"
+Write-Output "  powershell -NoProfile -ExecutionPolicy Bypass -File `"$watchdog`""
 Write-Output ""
 Write-Output "To remove:"
+if ($taskOk) { Write-Output "  Unregister-ScheduledTask -TaskName '$taskName' -Confirm:`$false" }
 Write-Output "  Remove-Item '$shortcutPath'"
