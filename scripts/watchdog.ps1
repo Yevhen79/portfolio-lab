@@ -64,12 +64,20 @@ function Test-Cmdline([string]$procName, [string]$needle) {
     return $null -ne $hit
 }
 
-function Test-NgrokTunnel {
-    # Process alive AND the local API reports a tunnel for our domain.
-    if (-not (Get-Process ngrok -ErrorAction SilentlyContinue)) { return $false }
+function Test-NgrokProcess {
+    return $null -ne (Get-Process ngrok -ErrorAction SilentlyContinue)
+}
+
+function Test-PublicUrl {
+    # AUTHORITATIVE end-to-end check: hit the PUBLIC url and confirm our
+    # backend answers. ngrok's LOCAL api (:4040) keeps reporting the tunnel
+    # as present even after its edge connection to the ngrok cloud has
+    # dropped (that is exactly ERR_NGROK_3200) — so the old local-only check
+    # was blind to the real failure. Going out through the public edge and
+    # back is the only reliable signal that users can actually reach the app.
     try {
-        $r = Invoke-WebRequest -Uri "http://127.0.0.1:4040/api/tunnels" -UseBasicParsing -TimeoutSec 4
-        return $r.Content -like "*$NGROK_DOMAIN*"
+        $r = Invoke-WebRequest -Uri "https://$NGROK_DOMAIN/api/health" -UseBasicParsing -TimeoutSec 8
+        return ($r.StatusCode -eq 200 -and $r.Content -like "*Portfolio Lab*")
     } catch {
         return $false
     }
@@ -106,6 +114,7 @@ function Restart-Ngrok {
 }
 
 # ---------------------------- monitor loop ----------------------------
+$ngrokFails = 0   # consecutive public-URL failures (debounce against blips)
 while ($true) {
     try {
         if (-not ((Test-Port 8000) -or (Test-Cmdline "python.exe" "uvicorn"))) {
@@ -118,12 +127,32 @@ while ($true) {
             Start-Frontend
             Start-Sleep 5
         }
-        # ngrok only matters once the frontend it points at is up.
+        # ngrok only matters once the frontend it points at is up locally —
+        # otherwise a public-URL failure would just reflect the local app
+        # being down, not the tunnel.
         if (Test-Port 5173) {
-            if (-not (Test-NgrokTunnel)) {
-                Log "[ngrok] tunnel DOWN -> restarting"
+            if (-not (Test-NgrokProcess)) {
+                # No agent at all -> restart immediately.
+                Log "[ngrok] process down -> restarting"
                 Restart-Ngrok
-                Start-Sleep 6
+                $ngrokFails = 0
+                Start-Sleep 8
+            }
+            elseif (-not (Test-PublicUrl)) {
+                # Process alive but the public edge isn't serving us. Could be
+                # a transient network blip, so require 2 consecutive failures
+                # before recycling to avoid thrashing.
+                $ngrokFails++
+                Log "[ngrok] public URL unreachable (strike $ngrokFails/2)"
+                if ($ngrokFails -ge 2) {
+                    Log "[ngrok] edge down -> restarting tunnel"
+                    Restart-Ngrok
+                    $ngrokFails = 0
+                    Start-Sleep 8
+                }
+            }
+            else {
+                $ngrokFails = 0
             }
         }
     } catch {
