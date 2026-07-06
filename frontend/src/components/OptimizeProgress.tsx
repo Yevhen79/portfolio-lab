@@ -185,8 +185,9 @@ export default function OptimizeProgress({ busy, compact = false }: Props) {
         </div>
 
         {/* Step list — past steps get a check, current gets a spinner,
-            future steps get a dim dot. Scrollable on very small screens. */}
-        <ol className="mt-4 sm:mt-6 space-y-1.5 max-h-[260px] overflow-y-auto pr-1">
+            future steps get a dim dot. All steps are shown at once (no inner
+            scroll) so the user sees the whole pipeline in a single view. */}
+        <ol className="mt-4 sm:mt-6 space-y-1.5">
           {STEPS.map((s, i) => {
             const isPast = i < stepIdx;
             const isCurrent = i === stepIdx && !finished;

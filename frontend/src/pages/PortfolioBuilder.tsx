@@ -162,6 +162,12 @@ export default function PortfolioBuilder() {
   async function runOptimize(override?: Partial<OptimizeRequest>) {
     const payload = override ? { ...req, ...override } : req;
     setBusy(true); setError(null);
+    // Scroll the page to the top so the user immediately sees the progress
+    // visualisation kick off (on desktop the progress card sits at the top
+    // of the right column; on a phone the results are below the form).
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
     try {
       const r = await portfoliosApi.optimize(payload);
       setResult(r);
