@@ -1,10 +1,18 @@
 import { api } from "./client";
 
 export type DeploymentMode = "personal" | "libertex_lite";
+export type Edition = "full" | "libertex";
 
 export interface AppConfig {
   deployment_mode: DeploymentMode;
+  /** Which product this instance is. Drives branding + theme. */
+  edition: Edition;
   app_name: string;
+  tagline: string;
+  /** Broker term interpolated into copy: "" for full, "Libertex" for libertex. */
+  broker_name: string;
+  /** Theme key the UI applies to <html data-theme>: "full" | "libertex". */
+  theme: string;
   features: {
     max_assets: number;
     advanced_metrics: boolean;

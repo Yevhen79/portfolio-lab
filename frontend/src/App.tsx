@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -11,8 +12,17 @@ import PortfolioBuilder from "./pages/PortfolioBuilder";
 import PortfolioCompare from "./pages/PortfolioCompare";
 import PortfolioView from "./pages/PortfolioView";
 import Register from "./pages/Register";
+import { useConfig } from "./store/config";
 
 export default function App() {
+  // Load deployment config as early as possible (it's a public endpoint) so
+  // the edition brand + theme apply even on the login / register pages,
+  // before the user authenticates.
+  const loadConfig = useConfig((s) => s.load);
+  useEffect(() => {
+    void loadConfig();
+  }, [loadConfig]);
+
   return (
     <ErrorBoundary>
       <Routes>

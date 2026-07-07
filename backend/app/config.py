@@ -55,6 +55,36 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Editions (white-label) — one codebase, two products
+# ---------------------------------------------------------------------------
+# `EDITION` in .env selects which product this instance IS. It drives three
+# things: (1) which FEATURE_FLAGS set is active, (2) branding (name/tagline/
+# broker term), and (3) the frontend theme (via a data-edition attribute the
+# UI sets from /api/config). Full = the broad-audience, monetised product with
+# generic terminology; libertex = the stripped-down, Libertex-branded gift
+# build. Run two instances of the SAME code, each with its own .env.
+EDITIONS: Dict[str, Dict[str, Any]] = {
+    "full": {
+        "feature_key": "personal",
+        "app_name":    "Portfolio Lab",
+        "tagline":     "Markowitz Engine",
+        # broker_name is interpolated into user-facing copy. Empty here so the
+        # full build reads broker-agnostic ("overnight financing costs", not
+        # "Libertex swap costs").
+        "broker_name": "",
+        "theme":       "full",   # frontend maps this to its cyan/magenta theme
+    },
+    "libertex": {
+        "feature_key": "libertex_lite",
+        "app_name":    "Libertex Portfolio",
+        "tagline":     "Markowitz Engine",
+        "broker_name": "Libertex",
+        "theme":       "libertex",  # frontend maps this to the red theme
+    },
+}
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=str(BACKEND_ROOT / ".env"),
@@ -109,7 +139,13 @@ class Settings(BaseSettings):
     MONTE_CARLO_SIMULATIONS: int = 5000
     SPARSIFICATION_THRESHOLD: float = 0.01
 
-    DEPLOYMENT_MODE: str = "personal"  # "personal" | "libertex_lite"
+    DEPLOYMENT_MODE: str = "personal"  # legacy; kept for /health display
+
+    # Which product this instance is: "full" (broad-audience, monetised,
+    # generic branding) or "libertex" (stripped, Libertex-branded gift).
+    # Drives features + branding + frontend theme. Default full so the live
+    # instance keeps its current behaviour.
+    EDITION: str = "full"
 
     # Interactive API docs (/docs, /redoc, /openapi.json) are OFF by default —
     # on an internet-facing deploy they hand an attacker the full API map.
@@ -151,13 +187,29 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
 
     @property
+    def edition(self) -> Dict[str, Any]:
+        """Branding + feature-key for the active EDITION (falls back to full)."""
+        return EDITIONS.get(self.EDITION, EDITIONS["full"])
+
+    @property
     def features(self) -> Dict[str, Any]:
-        """Active feature flags for the current DEPLOYMENT_MODE."""
-        return FEATURE_FLAGS.get(self.DEPLOYMENT_MODE, FEATURE_FLAGS["personal"])
+        """Active feature flags — selected by EDITION's feature_key."""
+        return FEATURE_FLAGS.get(self.edition["feature_key"], FEATURE_FLAGS["personal"])
 
     def feature(self, name: str, default: Any = None) -> Any:
-        """Look up a single feature flag value for the active deployment mode."""
+        """Look up a single feature flag value for the active edition."""
         return self.features.get(name, default)
+
+    @property
+    def branding(self) -> Dict[str, Any]:
+        """Branding tokens the frontend renders (name, tagline, broker, theme)."""
+        e = self.edition
+        return {
+            "app_name": e["app_name"],
+            "tagline": e["tagline"],
+            "broker_name": e["broker_name"],
+            "theme": e["theme"],
+        }
 
 
 settings = Settings()

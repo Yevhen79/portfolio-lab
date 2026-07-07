@@ -7,9 +7,11 @@ import { errorMessage } from "../api/client";
 import { useT } from "../i18n";
 import LangSwitcher from "../components/LangSwitcher";
 import { useAuth } from "../store/auth";
+import { useBrand } from "../store/config";
 
 export default function Login() {
   const t = useT();
+  const brand = useBrand();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -41,8 +43,8 @@ export default function Login() {
               <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-bg" />
             </div>
             <div className="min-w-0">
-              <div className="font-bold text-xl sm:text-2xl neon-text leading-tight truncate">{t.app.name}</div>
-              <div className="text-[10px] sm:text-xs uppercase tracking-widest text-text-dim truncate">{t.app.tagline}</div>
+              <div className="font-bold text-xl sm:text-2xl neon-text leading-tight truncate">{brand.appName}</div>
+              <div className="text-[10px] sm:text-xs uppercase tracking-widest text-text-dim truncate">{brand.tagline}</div>
             </div>
           </div>
           <LangSwitcher />

@@ -7,9 +7,11 @@ import { errorMessage } from "../api/client";
 import { useT } from "../i18n";
 import LangSwitcher from "../components/LangSwitcher";
 import { useAuth } from "../store/auth";
+import { useBrand } from "../store/config";
 
 export default function Register() {
   const t = useT();
+  const brand = useBrand();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -42,8 +44,8 @@ export default function Register() {
               <Sparkles className="w-6 h-6 text-bg" />
             </div>
             <div>
-              <div className="font-bold text-2xl neon-text leading-tight">{t.app.name}</div>
-              <div className="text-xs uppercase tracking-widest text-text-dim">{t.app.tagline}</div>
+              <div className="font-bold text-2xl neon-text leading-tight">{brand.appName}</div>
+              <div className="text-xs uppercase tracking-widest text-text-dim">{brand.tagline}</div>
             </div>
           </div>
           <LangSwitcher />

@@ -28,13 +28,18 @@ export default {
           muted: "#8A92AB",
           dim: "#5A627B",
         },
+        // Accent colours are CSS-variable driven so the app can be re-skinned
+        // per edition (full = cyan/magenta neon, libertex = red). The vars live
+        // in index.css; [data-theme="libertex"] overrides them and the frontend
+        // sets data-theme from /api/config on boot. RGB triplets so Tailwind's
+        // /alpha opacity modifiers (cyan/20 etc.) keep working.
         cyan: {
-          DEFAULT: "#00D4FF",
-          glow: "rgba(0, 212, 255, 0.45)",
+          DEFAULT: "rgb(var(--color-cyan) / <alpha-value>)",
+          glow: "rgb(var(--color-cyan) / 0.45)",
         },
         magenta: {
-          DEFAULT: "#FF00AA",
-          glow: "rgba(255, 0, 170, 0.45)",
+          DEFAULT: "rgb(var(--color-magenta) / <alpha-value>)",
+          glow: "rgb(var(--color-magenta) / 0.45)",
         },
         green: {
           DEFAULT: "#00FF94",
@@ -53,21 +58,21 @@ export default {
         mono: ["JetBrains Mono", "Consolas", "Monaco", "monospace"],
       },
       boxShadow: {
-        glow: "0 0 40px rgba(0, 212, 255, 0.25)",
-        "glow-magenta": "0 0 40px rgba(255, 0, 170, 0.25)",
+        glow: "0 0 40px rgb(var(--color-cyan) / 0.25)",
+        "glow-magenta": "0 0 40px rgb(var(--color-magenta) / 0.25)",
         "glow-green": "0 0 30px rgba(0, 255, 148, 0.3)",
         card: "0 8px 32px rgba(0, 0, 0, 0.4)",
       },
       backgroundImage: {
         "grid-pattern":
-          "linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px)",
+          "linear-gradient(rgb(var(--color-cyan) / 0.04) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--color-cyan) / 0.04) 1px, transparent 1px)",
         "neon-gradient":
-          "linear-gradient(135deg, #00D4FF 0%, #FF00AA 100%)",
+          "linear-gradient(135deg, rgb(var(--color-cyan)) 0%, rgb(var(--color-magenta)) 100%)",
       },
       keyframes: {
         pulse_glow: {
-          "0%, 100%": { boxShadow: "0 0 20px rgba(0,212,255,0.3)" },
-          "50%": { boxShadow: "0 0 40px rgba(0,212,255,0.6)" },
+          "0%, 100%": { boxShadow: "0 0 20px rgb(var(--color-cyan) / 0.3)" },
+          "50%": { boxShadow: "0 0 40px rgb(var(--color-cyan) / 0.6)" },
         },
         slide_up: {
           from: { opacity: "0", transform: "translateY(8px)" },

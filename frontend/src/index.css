@@ -4,6 +4,19 @@
 
 :root {
   color-scheme: dark;
+  /* Accent colours as space-separated RGB triplets so Tailwind's
+     rgb(var(--x) / <alpha>) utilities work. Default = full edition (cyan +
+     magenta neon). The frontend sets data-theme on <html> from /api/config;
+     the libertex override below re-skins the whole app to red without any
+     component changes. */
+  --color-cyan: 0 212 255;
+  --color-magenta: 255 0 170;
+}
+
+/* Libertex edition palette — brand red + warm orange. */
+[data-theme="libertex"] {
+  --color-cyan: 227 6 19;
+  --color-magenta: 255 106 0;
 }
 
 html, body, #root {
@@ -44,7 +57,7 @@ body {
     @apply card hover:shadow-glow transition-shadow duration-300;
   }
   .neon-text {
-    background: linear-gradient(135deg, #00D4FF 0%, #FF00AA 100%);
+    background: linear-gradient(135deg, rgb(var(--color-cyan)) 0%, rgb(var(--color-magenta)) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;

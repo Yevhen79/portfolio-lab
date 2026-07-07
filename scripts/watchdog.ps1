@@ -86,7 +86,13 @@ function Test-PublicUrl {
 function Start-Backend {
     $py = Join-Path $root "backend\.venv\Scripts\python.exe"
     if (-not (Test-Path $py)) { Log "[backend] venv python missing at $py"; return }
-    $args = @("-m","uvicorn","app.main:app","--host","127.0.0.1","--port","8000","--reload")
+    # NO --reload for the always-on deploy: --reload spawns a watcher +
+    # subprocess worker, and on this box the worker resolved to SYSTEM python
+    # (not the venv), so stale system-python uvicorns kept fighting over :8000
+    # and serving old code. A single plain process uses exactly this venv
+    # interpreter. Code changes are picked up on the next restart (crash-
+    # restart by the watchdog, or a manual kill).
+    $args = @("-m","uvicorn","app.main:app","--host","127.0.0.1","--port","8000")
     $lp = Join-Path $logDir "uvicorn.log"
     Start-Process -FilePath $py -ArgumentList $args -WorkingDirectory (Join-Path $root "backend") `
         -WindowStyle Hidden -RedirectStandardOutput $lp -RedirectStandardError "$lp.err"

@@ -17,11 +17,13 @@ import {
 import * as adminApi from "../api/admin";
 import { useT } from "../i18n";
 import { useAuth } from "../store/auth";
+import { useBrand } from "../store/config";
 import LangSwitcher from "./LangSwitcher";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const t = useT();
+  const brand = useBrand();
   const loc = useLocation();
   const nav = useNavigate();
   const [notif, setNotif] = useState({ pending_users: 0, pending_quota_requests: 0 });
@@ -71,10 +73,10 @@ export default function Navbar() {
           </div>
           <div className="hidden xs:block min-w-0">
             <div className="font-bold text-base sm:text-lg neon-text leading-tight truncate">
-              {t.app.name}
+              {brand.appName}
             </div>
             <div className="text-[10px] uppercase tracking-widest text-text-dim hidden sm:block">
-              {t.app.tagline}
+              {brand.tagline}
             </div>
           </div>
         </Link>

@@ -14,8 +14,13 @@ router = APIRouter(prefix="/config", tags=["config"])
 
 @router.get("")
 def get_config() -> dict:
+    b = settings.branding
     return {
         "deployment_mode": settings.DEPLOYMENT_MODE,
+        "edition": settings.EDITION,          # "full" | "libertex"
         "features": settings.features,
-        "app_name": "Portfolio Lab",
+        "app_name": b["app_name"],
+        "tagline": b["tagline"],
+        "broker_name": b["broker_name"],      # "" for full, "Libertex" for libertex
+        "theme": b["theme"],                  # frontend swaps CSS vars on this
     }
