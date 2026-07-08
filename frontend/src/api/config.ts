@@ -25,6 +25,11 @@ export interface AppConfig {
     geometric_mean: boolean;
     history_max_years: number;
     monte_carlo_sims: number;
+    /** UI simplifications for the libertex gift build (all false in full). */
+    hide_swaps_ui: boolean;
+    force_swaps: boolean;
+    hide_min_variance: boolean;
+    ai_strategy_naming: boolean;
   };
 }
 

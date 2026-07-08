@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertCircle, Ban, Loader2, Play, Plus, Save, Target, X } from "lucide-react";
+import { AlertCircle, Ban, Check, Loader2, Play, Plus, Save, Target, X } from "lucide-react";
 
 import { errorMessage } from "../api/client";
 import * as portfoliosApi from "../api/portfolios";
@@ -20,6 +20,7 @@ import OptimizeProgress from "../components/OptimizeProgress";
 import Section from "../components/Section";
 import { useT, tpl } from "../i18n";
 import { useAuth } from "../store/auth";
+import { useConfig } from "../store/config";
 import { fmtPct, fmtUSD, sparsifyForDisplay } from "../utils/format";
 
 const DEFAULT_REQ: OptimizeRequest = {
@@ -151,10 +152,30 @@ export default function PortfolioBuilder() {
   const { user, refresh } = useAuth();
   const t = useT();
   const nav = useNavigate();
+  const cfgFeatures = useConfig((s) => s.config?.features);
+  // Edition-driven UI simplifications (all false / off in the full build).
+  const hideSwapsUi = cfgFeatures?.hide_swaps_ui ?? false;
+  const forceSwaps = cfgFeatures?.force_swaps ?? false;
+  const hideMinVariance = cfgFeatures?.hide_min_variance ?? false;
+  const aiNaming = cfgFeatures?.ai_strategy_naming ?? false;
 
   function update<K extends keyof OptimizeRequest>(k: K, v: OptimizeRequest[K]) {
     setReq((r) => ({ ...r, [k]: v }));
   }
+
+  // When the edition forces swaps on, keep the request in sync so the saved
+  // portfolio + UI reflect it (the backend enforces it regardless).
+  useEffect(() => {
+    if (forceSwaps && !req.apply_swaps) update("apply_swaps", true);
+  }, [forceSwaps, req.apply_swaps]);
+
+  // If Min Variance is hidden (libertex) but a persisted session had it
+  // selected, fall back to the AI (max-Sharpe) strategy.
+  useEffect(() => {
+    if (hideMinVariance && req.portfolio_type === "min_variance") {
+      update("portfolio_type", "max_sharpe");
+    }
+  }, [hideMinVariance, req.portfolio_type]);
 
   // The `override` argument lets us re-run with a freshly-computed exclusion
   // list without waiting for React's state batch to flush. `setReq` + reading
@@ -402,8 +423,10 @@ export default function PortfolioBuilder() {
             help={
               <HelpTip title={t.builder.strategy_help_title} width={360}>
                 <ul className="space-y-1.5">
-                  <li><b className="text-cyan">{t.builder.strategy_max_sharpe}</b> — {t.builder.strategy_help_max_sharpe}</li>
-                  <li><b className="text-cyan">{t.builder.strategy_min_variance}</b> — {t.builder.strategy_help_min_variance}</li>
+                  <li><b className="text-cyan">{aiNaming ? t.builder.strategy_ai_choice : t.builder.strategy_max_sharpe}</b> — {t.builder.strategy_help_max_sharpe}</li>
+                  {!hideMinVariance && (
+                    <li><b className="text-cyan">{t.builder.strategy_min_variance}</b> — {t.builder.strategy_help_min_variance}</li>
+                  )}
                   <li><b className="text-cyan">{t.builder.strategy_target_return}</b> — {t.builder.strategy_help_target_return}</li>
                   <li><b className="text-cyan">{t.builder.strategy_target_risk}</b> — {t.builder.strategy_help_target_risk}</li>
                 </ul>
@@ -412,11 +435,11 @@ export default function PortfolioBuilder() {
           >
             <div className="grid grid-cols-2 gap-2">
               {[
-                { v: "max_sharpe", label: t.builder.strategy_max_sharpe, hint: t.builder.strategy_btn_hint_max_sharpe },
+                { v: "max_sharpe", label: aiNaming ? t.builder.strategy_ai_choice : t.builder.strategy_max_sharpe, hint: t.builder.strategy_btn_hint_max_sharpe },
                 { v: "min_variance", label: t.builder.strategy_min_variance, hint: t.builder.strategy_btn_hint_min_variance },
                 { v: "target_return", label: t.builder.strategy_target_return, hint: t.builder.strategy_btn_hint_target_return },
                 { v: "target_risk", label: t.builder.strategy_target_risk, hint: t.builder.strategy_btn_hint_target_risk },
-              ].map((b) => (
+              ].filter((b) => !(hideMinVariance && b.v === "min_variance")).map((b) => (
                 <button
                   key={b.v}
                   onClick={() => update("portfolio_type", b.v as any)}
@@ -433,44 +456,59 @@ export default function PortfolioBuilder() {
             </div>
           </Section>
 
-          <Section
-            title={t.builder.swaps_title}
-            subtitle={
-              req.apply_swaps
-                ? t.builder.swaps_subtitle_on
-                : t.builder.swaps_subtitle_off
-            }
-            help={
-              <HelpTip title={t.builder.swaps_help_title} width={380}>
-                {t.builder.swaps_help_body}
-              </HelpTip>
-            }
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-sm text-text-muted leading-relaxed">
-                {req.apply_swaps
-                  ? t.builder.swaps_status_on
-                  : t.builder.swaps_status_off}
+          {hideSwapsUi ? (
+            /* Libertex build: swaps are always applied and the toggle is
+               hidden. Keep a small notice so the user knows the portfolio
+               already nets out overnight financing. */
+            <div className="card p-3 sm:p-4 border-cyan/25 bg-cyan/5 flex items-start gap-2.5">
+              <Check className="w-4 h-4 text-cyan mt-0.5 shrink-0" />
+              <div className="text-xs sm:text-sm text-text-muted leading-relaxed">
+                {t.builder.swaps_included_note}
+                <HelpTip title={t.builder.swaps_help_title} width={360}>
+                  {t.builder.swaps_help_body}
+                </HelpTip>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={req.apply_swaps ?? false}
-                onClick={() => update("apply_swaps", !req.apply_swaps)}
-                className={`shrink-0 inline-flex items-center h-7 w-12 rounded-full border transition-colors ${
-                  req.apply_swaps
-                    ? "bg-cyan/20 border-cyan justify-end"
-                    : "bg-bg-elevated border-border justify-start"
-                }`}
-              >
-                <span
-                  className={`mx-1 w-5 h-5 rounded-full transition-colors ${
-                    req.apply_swaps ? "bg-cyan shadow-glow" : "bg-text-dim"
-                  }`}
-                />
-              </button>
             </div>
-          </Section>
+          ) : (
+            <Section
+              title={t.builder.swaps_title}
+              subtitle={
+                req.apply_swaps
+                  ? t.builder.swaps_subtitle_on
+                  : t.builder.swaps_subtitle_off
+              }
+              help={
+                <HelpTip title={t.builder.swaps_help_title} width={380}>
+                  {t.builder.swaps_help_body}
+                </HelpTip>
+              }
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm text-text-muted leading-relaxed">
+                  {req.apply_swaps
+                    ? t.builder.swaps_status_on
+                    : t.builder.swaps_status_off}
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={req.apply_swaps ?? false}
+                  onClick={() => update("apply_swaps", !req.apply_swaps)}
+                  className={`shrink-0 inline-flex items-center h-7 w-12 rounded-full border transition-colors ${
+                    req.apply_swaps
+                      ? "bg-cyan/20 border-cyan justify-end"
+                      : "bg-bg-elevated border-border justify-start"
+                  }`}
+                >
+                  <span
+                    className={`mx-1 w-5 h-5 rounded-full transition-colors ${
+                      req.apply_swaps ? "bg-cyan shadow-glow" : "bg-text-dim"
+                    }`}
+                  />
+                </button>
+              </div>
+            </Section>
+          )}
 
           <Section
             title={t.builder.capital_title}

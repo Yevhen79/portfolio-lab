@@ -38,6 +38,11 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "geometric_mean":     True,    # show CAGR alongside arithmetic μ
         "history_max_years":  25,
         "monte_carlo_sims":   5000,
+        # --- UI simplifications (libertex gift build only) ---
+        "hide_swaps_ui":      False,   # hide the swap toggle section
+        "force_swaps":        False,   # force overnight swaps ON regardless of request
+        "hide_min_variance":  False,   # hide the Min Variance strategy everywhere
+        "ai_strategy_naming": False,   # rename Max Sharpe -> "AI choice"
     },
     "libertex_lite": {
         "max_assets":         50,
@@ -51,6 +56,11 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "geometric_mean":     True,    # still show CAGR — basic sanity, no IP
         "history_max_years":  10,
         "monte_carlo_sims":   1000,
+        # Simplified, consumer-friendly UI for the Libertex gift build.
+        "hide_swaps_ui":      True,    # swaps are always on; no toggle shown
+        "force_swaps":        True,    # every portfolio already nets out swaps
+        "hide_min_variance":  True,    # only AI (max-Sharpe) & target strategies
+        "ai_strategy_naming": True,    # Max Sharpe shown as "AI choice"
     },
 }
 
@@ -77,7 +87,7 @@ EDITIONS: Dict[str, Dict[str, Any]] = {
     },
     "libertex": {
         "feature_key": "libertex_lite",
-        "app_name":    "Libertex Portfolio",
+        "app_name":    "Libertex Portfolio Builder",
         "tagline":     "Markowitz Engine",
         "broker_name": "Libertex",
         "theme":       "libertex",  # frontend maps this to the red theme

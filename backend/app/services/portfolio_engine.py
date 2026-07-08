@@ -44,6 +44,17 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
     history_cap = settings.feature("history_max_years", req.history_years)
     history_years = min(req.history_years, history_cap)
 
+    # Libertex gift build always nets out overnight swaps — the toggle is
+    # hidden in that edition, so force it on here regardless of the request.
+    if settings.feature("force_swaps", False):
+        req.apply_swaps = True
+
+    # Same build hides Min Variance; if a client still asks for it, fall back
+    # to the AI (max-Sharpe) strategy so the endpoint can't be used to reach
+    # a hidden mode.
+    if settings.feature("hide_min_variance", False) and req.portfolio_type == "min_variance":
+        req.portfolio_type = "max_sharpe"
+
     # Parse optional as-of cutoff. Anything in the future is silently treated
     # as "no cutoff" — the engine doesn't need to validate that here because
     # the backtest endpoint enforces the past-date rule before calling us.
