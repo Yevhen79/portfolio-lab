@@ -13,10 +13,11 @@
   --color-magenta: 255 0 170;
 }
 
-/* Libertex edition palette — brand red + warm orange. */
+/* Libertex edition palette — the brand gold->orange gradient lifted from the
+   Libertex logo (Pelican / CopyTrading project): #FFA408 -> #FF5208. */
 [data-theme="libertex"] {
-  --color-cyan: 227 6 19;
-  --color-magenta: 255 106 0;
+  --color-cyan: 255 164 8;    /* #FFA408 gold  */
+  --color-magenta: 255 82 8;  /* #FF5208 orange */
 }
 
 html, body, #root {

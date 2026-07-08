@@ -43,7 +43,7 @@ export const en = {
     hero_title_em: "Markowitz mean-variance engine",
     hero_title_post: ".",
     hero_subtitle:
-      "Monthly historical data, 20-year horizon, Ledoit-Wolf shrinkage, full Libertex instrument catalogue. Efficient frontier · Monte Carlo · benchmark comparison · PDF/Excel export.",
+      "Monthly historical data, 20-year horizon, Ledoit-Wolf shrinkage, full {broker} instrument catalogue. Efficient frontier · Monte Carlo · benchmark comparison · PDF/Excel export.",
     build_new: "Build New Portfolio",
     view_history: "View History",
     compare_btn: "Compare Portfolios",
@@ -64,7 +64,7 @@ export const en = {
   builder: {
     page_title: "Portfolio Builder",
     page_subtitle:
-      "Markowitz mean-variance optimization across the full Libertex instrument catalogue.",
+      "Markowitz mean-variance optimization across the full {broker} instrument catalogue.",
     today_used: "Today",
     strategy_title: "Strategy",
     strategy_subtitle: "Pick optimization objective.",
@@ -84,11 +84,11 @@ export const en = {
     swaps_title: "Overnight swap costs",
     swaps_subtitle_on: "Subtracted from each asset's return.",
     swaps_subtitle_off: "Ignored — historical-only optimisation.",
-    swaps_status_on: "Net-of-holding-cost mode: returns reflect what you keep after Libertex daily swap.",
+    swaps_status_on: "Net-of-holding-cost mode: returns reflect what you keep after {broker} daily swap.",
     swaps_status_off: "Pure-history mode: optimised on raw underlying returns.",
-    swaps_help_title: "Libertex overnight swap",
+    swaps_help_title: "{broker} overnight swap",
     swaps_help_body:
-      "Libertex charges a small daily fee for holding CFD positions overnight (\"swap\"). US stocks: −0.0302% / day ≈ −11% per year. Crypto: −0.014% / day on BTC/ETH, −0.07% / day on alts. These costs eat into long-term returns and the optimum portfolio looks DIFFERENT when they are accounted for. Toggle ON to subtract swap from each asset's monthly returns before optimisation — the optimiser will tilt away from high-cost names. Σ (volatility) is unchanged since swap is deterministic. Both modes are useful — OFF gives the academic Markowitz answer on raw historical returns; ON shows what you'd actually realise on a Libertex CFD account.",
+      "Brokers charge a small daily fee for holding CFD positions overnight (\"swap\"). US stocks: −0.0302% / day ≈ −11% per year. Crypto: −0.014% / day on BTC/ETH, −0.07% / day on alts. These costs eat into long-term returns and the optimum portfolio looks DIFFERENT when they are accounted for. Toggle ON to subtract swap from each asset's monthly returns before optimisation — the optimiser will tilt away from high-cost names. Σ (volatility) is unchanged since swap is deterministic. Both modes are useful — OFF gives the academic Markowitz answer on raw historical returns; ON shows what you'd actually realise on a {broker} CFD account.",
     capital_title: "Capital",
     capital_subtitle: "USD invested today.",
     capital_help_title: "Initial capital",
@@ -181,7 +181,7 @@ export const en = {
       "Drops any asset whose latest close is more than this fraction below its historical peak inside the analysis window. Default 60% catches names like ENPH-2024 (last ~$100 vs peak $329 = 68% below ATH) that the optimiser would otherwise pick on the basis of positive average historical return. Slider right to relax — at 100% the filter is off. Does NOT penalise assets that crashed but fully recovered (NVDA-2002, AMZN-2001 are both currently near ATH and pass the filter). Catches: 'recently in a deep hole and hasn't bounced back yet'. Misses: 'historically extremely volatile but now fine'.",
     universe_size_help_title: "How many instruments to analyse",
     universe_size_help_body:
-      "Hard cap on how many instruments reach the optimiser. The catalogue holds ~1,500 mapped Libertex tickers, but the actual asset pool passed to Markowitz is smaller after these sequential filters: (1) category & exclusions; (2) yfinance availability; (3) data-quality (drops series with implausible monthly spikes — broken yfinance unit shifts); (4) min-history filter (the biggest cut — newer crypto and recent IPOs get dropped); (5) negative-mean filter (assets that lost money on average historically are out); (6) THIS cap — ranks survivors by μ/σ (Sharpe-like) and keeps the top N. Click \"All available\" to skip the μ/σ ranking step entirely.",
+      "Hard cap on how many instruments reach the optimiser. The catalogue holds ~1,500 mapped {broker} tickers, but the actual asset pool passed to Markowitz is smaller after these sequential filters: (1) category & exclusions; (2) yfinance availability; (3) data-quality (drops series with implausible monthly spikes — broken yfinance unit shifts); (4) min-history filter (the biggest cut — newer crypto and recent IPOs get dropped); (5) negative-mean filter (assets that lost money on average historically are out); (6) THIS cap — ranks survivors by μ/σ (Sharpe-like) and keeps the top N. Click \"All available\" to skip the μ/σ ranking step entirely.",
     create_portfolio: "Create Portfolio",
     rerun_optimization: "Re-run Optimization",
     optimizing: "Optimizing...",
@@ -195,7 +195,7 @@ export const en = {
     placeholder_history_value: "{years} years monthly",
     placeholder_universe: "Instruments",
     placeholder_universe_value: "up to {n} assets",
-    busy_title: "Building portfolio across the full Libertex catalogue...",
+    busy_title: "Building portfolio across the full {broker} catalogue...",
     busy_hint: "First run can take 30-60s while prices download.",
     optimization_failed: "Optimization failed",
     trace_download_label: "Trace",
@@ -341,7 +341,7 @@ export const en = {
   admin: {
     page_title: "Admin Panel",
     page_subtitle: "User management, quotas, and asset catalogue control.",
-    refresh_libertex: "Refresh Libertex Catalogue",
+    refresh_libertex: "Refresh {broker} Catalogue",
     pending_users_title: "Pending User Approvals · {n}",
     pending_users_subtitle: "New registrations awaiting your decision.",
     pending_quota_title: "Pending Quota Requests · {n}",
@@ -371,10 +371,10 @@ export const en = {
     quota_col_status: "Status",
     quota_col_requested: "Requested",
     quota_col_decided: "Decided",
-    libertex_refreshed: "Libertex catalogue refreshed: +{added} added, {updated} updated, {total} total.",
+    libertex_refreshed: "{broker} catalogue refreshed: +{added} added, {updated} updated, {total} total.",
     libertex_failed: "Failed: ",
     refresh_swaps: "Refresh Swap Rates",
-    swaps_refresh_tooltip: "Re-scrape Libertex overnight-swap rates. Runs in background — typical 30–90 s.",
+    swaps_refresh_tooltip: "Re-scrape {broker} overnight-swap rates. Runs in background — typical 30–90 s.",
     swaps_refresh_failed: "Swap refresh failed: ",
     swaps_in_progress: "Swap refresh running…",
     swaps_last_refresh: "Swap rates updated",
@@ -600,20 +600,20 @@ export const en = {
         body:
           "The optimiser found a feasible weight allocation, but its expected annual return is {target} — non-positive. Building a portfolio that promises to lose money on average makes no investment sense, so we refuse to deliver it.",
         tips: [
-          "Turn OFF \"Apply Libertex swap costs\" — overnight fees can flip an otherwise profitable mix into a net loss, especially for Min Variance which doesn't care about return",
+          "Turn OFF \"Apply {broker} swap costs\" — overnight fees can flip an otherwise profitable mix into a net loss, especially for Min Variance which doesn't care about return",
           "Switch strategy to Max Sharpe instead of Min Variance — it explicitly maximises return-per-risk, so the result is rarely negative",
           "Widen the universe: enable more categories (Stocks, ETF, etc.) or raise \"Instruments for analysis\"",
           "Push the as-of date forward — the older the window, the more weight 2008 / 2022 drawdowns get and the harder it is to find consistently positive assets",
         ],
       },
       ALL_NEGATIVE_AFTER_SWAPS: {
-        title: "Almost every asset becomes unprofitable after Libertex swaps",
+        title: "Almost every asset becomes unprofitable after {broker} swaps",
         body:
           "After subtracting overnight swap costs from each instrument's historical return, only {n_assets} assets are still expected to make money. That's not enough for a Markowitz optimisation (need ≥ 5).",
         tips: [
-          "Turn OFF \"Apply Libertex swap costs\" if you only want the academic, swap-free view",
+          "Turn OFF \"Apply {broker} swap costs\" if you only want the academic, swap-free view",
           "Enable more asset categories — crypto and forex have much smaller swap costs than the default leverage on stocks",
-          "Reconsider whether long-only CFD holding makes sense on this universe — typical Libertex stock swap is ~-11%/year and only the best performers clear that hurdle",
+          "Reconsider whether long-only CFD holding makes sense on this universe — typical {broker} stock swap is ~-11%/year and only the best performers clear that hurdle",
         ],
       },
       GENERIC: {
@@ -654,7 +654,7 @@ export const en = {
     hint_done: "Done — preparing results.",
     steps_done: "All steps complete",
     steps: {
-      loading_catalog: "Loading the Libertex asset catalogue",
+      loading_catalog: "Loading the {broker} asset catalogue",
       fetching_prices: "Downloading historical prices from Yahoo Finance (parquet cache hits skipped)",
       monthly_returns: "Resampling to month-end + computing pct returns; dropping series with implausible spikes",
       history_filter: "Filtering assets with too little history and non-positive mean return",
