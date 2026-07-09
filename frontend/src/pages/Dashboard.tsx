@@ -7,11 +7,13 @@ import type { PortfolioListItem } from "../api/portfolios";
 import Section from "../components/Section";
 import { useT } from "../i18n";
 import { useAuth } from "../store/auth";
+import { useConfig } from "../store/config";
 import { fmtDate, fmtNum, fmtPct, fmtUSD } from "../utils/format";
 
 export default function Dashboard() {
   const { user } = useAuth();
   const t = useT();
+  const hideCompare = useConfig((s) => s.config?.features?.hide_compare ?? false);
   const [items, setItems] = useState<PortfolioListItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -51,9 +53,11 @@ export default function Dashboard() {
             <Link to="/history" className="btn-ghost inline-flex items-center gap-2 text-sm">
               <History className="w-4 h-4" /> {t.dashboard.view_history}
             </Link>
-            <Link to="/compare" className="btn-ghost inline-flex items-center gap-2 text-sm">
-              <GitCompare className="w-4 h-4" /> {t.dashboard.compare_btn}
-            </Link>
+            {!hideCompare && (
+              <Link to="/compare" className="btn-ghost inline-flex items-center gap-2 text-sm">
+                <GitCompare className="w-4 h-4" /> {t.dashboard.compare_btn}
+              </Link>
+            )}
           </div>
         </div>
       </div>

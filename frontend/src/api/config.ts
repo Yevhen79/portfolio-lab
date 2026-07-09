@@ -30,6 +30,8 @@ export interface AppConfig {
     force_swaps: boolean;
     hide_min_variance: boolean;
     ai_strategy_naming: boolean;
+    hide_backtest: boolean;
+    hide_compare: boolean;
   };
 }
 

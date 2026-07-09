@@ -17,13 +17,17 @@ import {
 import * as adminApi from "../api/admin";
 import { useT } from "../i18n";
 import { useAuth } from "../store/auth";
-import { useBrand } from "../store/config";
+import { useBrand, useConfig } from "../store/config";
 import LangSwitcher from "./LangSwitcher";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const t = useT();
   const brand = useBrand();
+  const cfgFeatures = useConfig((s) => s.config?.features);
+  // Edition can hide whole pages (libertex gift build).
+  const hideBacktest = cfgFeatures?.hide_backtest ?? false;
+  const hideCompare = cfgFeatures?.hide_compare ?? false;
   const loc = useLocation();
   const nav = useNavigate();
   const [notif, setNotif] = useState({ pending_users: 0, pending_quota_requests: 0 });
@@ -89,15 +93,19 @@ export default function Navbar() {
           <Link to="/build" className={desktopLinkClass("/build")}>
             <Plus className="w-4 h-4" /> {t.nav.build}
           </Link>
-          <Link to="/backtest" className={desktopLinkClass("/backtest")}>
-            <CalendarClock className="w-4 h-4" /> {t.nav.backtest}
-          </Link>
+          {!hideBacktest && (
+            <Link to="/backtest" className={desktopLinkClass("/backtest")}>
+              <CalendarClock className="w-4 h-4" /> {t.nav.backtest}
+            </Link>
+          )}
           <Link to="/history" className={desktopLinkClass("/history")}>
             <History className="w-4 h-4" /> {t.nav.history}
           </Link>
-          <Link to="/compare" className={desktopLinkClass("/compare")}>
-            <GitCompare className="w-4 h-4" /> {t.nav.compare}
-          </Link>
+          {!hideCompare && (
+            <Link to="/compare" className={desktopLinkClass("/compare")}>
+              <GitCompare className="w-4 h-4" /> {t.nav.compare}
+            </Link>
+          )}
           {user?.role === "admin" && (
             <Link to="/admin" className={desktopLinkClass("/admin") + " relative"}>
               <Shield className="w-4 h-4" /> {t.nav.admin}
@@ -197,15 +205,19 @@ export default function Navbar() {
               <Link to="/build" className={mobileLinkClass("/build")}>
                 <Plus className="w-5 h-5" /> {t.nav.build}
               </Link>
-              <Link to="/backtest" className={mobileLinkClass("/backtest")}>
-                <CalendarClock className="w-5 h-5" /> {t.nav.backtest}
-              </Link>
+              {!hideBacktest && (
+                <Link to="/backtest" className={mobileLinkClass("/backtest")}>
+                  <CalendarClock className="w-5 h-5" /> {t.nav.backtest}
+                </Link>
+              )}
               <Link to="/history" className={mobileLinkClass("/history")}>
                 <History className="w-5 h-5" /> {t.nav.history}
               </Link>
-              <Link to="/compare" className={mobileLinkClass("/compare")}>
-                <GitCompare className="w-5 h-5" /> {t.nav.compare}
-              </Link>
+              {!hideCompare && (
+                <Link to="/compare" className={mobileLinkClass("/compare")}>
+                  <GitCompare className="w-5 h-5" /> {t.nav.compare}
+                </Link>
+              )}
               {user?.role === "admin" && (
                 <Link to="/admin" className={mobileLinkClass("/admin") + " relative"}>
                   <Shield className="w-5 h-5" /> {t.nav.admin}

@@ -43,6 +43,8 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "force_swaps":        False,   # force overnight swaps ON regardless of request
         "hide_min_variance":  False,   # hide the Min Variance strategy everywhere
         "ai_strategy_naming": False,   # rename Max Sharpe -> "AI choice"
+        "hide_backtest":      False,   # hide the Backtest page + nav link
+        "hide_compare":       False,   # hide the Compare page + nav link
     },
     "libertex_lite": {
         "max_assets":         50,
@@ -61,6 +63,8 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "force_swaps":        True,    # every portfolio already nets out swaps
         "hide_min_variance":  True,    # only AI (max-Sharpe) & target strategies
         "ai_strategy_naming": True,    # Max Sharpe shown as "AI choice"
+        "hide_backtest":      True,    # no Backtest page in the gift build
+        "hide_compare":       True,    # no Compare page in the gift build
     },
 }
 
