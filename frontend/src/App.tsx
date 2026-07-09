@@ -26,6 +26,7 @@ export default function App() {
   // Editions can hide whole pages; direct-URL access is redirected home.
   const hideBacktest = useConfig((s) => s.config?.features?.hide_backtest ?? false);
   const hideCompare = useConfig((s) => s.config?.features?.hide_compare ?? false);
+  const hideHistory = useConfig((s) => s.config?.features?.hide_history ?? false);
 
   return (
     <ErrorBoundary>
@@ -37,7 +38,7 @@ export default function App() {
           <Route path="/build" element={<PortfolioBuilder />} />
           <Route path="/backtest" element={hideBacktest ? <Navigate to="/" replace /> : <BacktestPage />} />
           <Route path="/portfolio/:id" element={<PortfolioView />} />
-          <Route path="/history" element={<History />} />
+          <Route path="/history" element={hideHistory ? <Navigate to="/" replace /> : <History />} />
           <Route path="/compare" element={hideCompare ? <Navigate to="/" replace /> : <PortfolioCompare />} />
           <Route path="/admin" element={<Admin />} />
         </Route>

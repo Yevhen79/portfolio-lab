@@ -46,6 +46,8 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "hide_backtest":      False,   # hide the Backtest page + nav link
         "hide_compare":       False,   # hide the Compare page + nav link
         "nobel_hero":         False,   # consumer "Nobel portfolio" dashboard hero
+        "dashboard_table":    False,   # render dashboard portfolios as a table
+        "hide_history":       False,   # hide History page + nav (merged into dashboard)
     },
     "libertex_lite": {
         "max_assets":         50,
@@ -67,6 +69,8 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "hide_backtest":      True,    # no Backtest page in the gift build
         "hide_compare":       True,    # no Compare page in the gift build
         "nobel_hero":         True,    # "Create your own Nobel portfolio!" hero
+        "dashboard_table":    True,    # sortable table beats cards for comparison
+        "hide_history":       True,    # history lives on the dashboard now
     },
 }
 

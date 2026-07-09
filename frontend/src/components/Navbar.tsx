@@ -28,6 +28,7 @@ export default function Navbar() {
   // Edition can hide whole pages (libertex gift build).
   const hideBacktest = cfgFeatures?.hide_backtest ?? false;
   const hideCompare = cfgFeatures?.hide_compare ?? false;
+  const hideHistory = cfgFeatures?.hide_history ?? false;
   const loc = useLocation();
   const nav = useNavigate();
   const [notif, setNotif] = useState({ pending_users: 0, pending_quota_requests: 0 });
@@ -98,9 +99,11 @@ export default function Navbar() {
               <CalendarClock className="w-4 h-4" /> {t.nav.backtest}
             </Link>
           )}
-          <Link to="/history" className={desktopLinkClass("/history")}>
-            <History className="w-4 h-4" /> {t.nav.history}
-          </Link>
+          {!hideHistory && (
+            <Link to="/history" className={desktopLinkClass("/history")}>
+              <History className="w-4 h-4" /> {t.nav.history}
+            </Link>
+          )}
           {!hideCompare && (
             <Link to="/compare" className={desktopLinkClass("/compare")}>
               <GitCompare className="w-4 h-4" /> {t.nav.compare}
@@ -210,9 +213,11 @@ export default function Navbar() {
                   <CalendarClock className="w-5 h-5" /> {t.nav.backtest}
                 </Link>
               )}
-              <Link to="/history" className={mobileLinkClass("/history")}>
-                <History className="w-5 h-5" /> {t.nav.history}
-              </Link>
+              {!hideHistory && (
+                <Link to="/history" className={mobileLinkClass("/history")}>
+                  <History className="w-5 h-5" /> {t.nav.history}
+                </Link>
+              )}
               {!hideCompare && (
                 <Link to="/compare" className={mobileLinkClass("/compare")}>
                   <GitCompare className="w-5 h-5" /> {t.nav.compare}

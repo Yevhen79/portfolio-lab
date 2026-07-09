@@ -33,6 +33,8 @@ export interface AppConfig {
     hide_backtest: boolean;
     hide_compare: boolean;
     nobel_hero: boolean;
+    dashboard_table: boolean;
+    hide_history: boolean;
   };
 }
 
