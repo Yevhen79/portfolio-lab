@@ -45,6 +45,7 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "ai_strategy_naming": False,   # rename Max Sharpe -> "AI choice"
         "hide_backtest":      False,   # hide the Backtest page + nav link
         "hide_compare":       False,   # hide the Compare page + nav link
+        "nobel_hero":         False,   # consumer "Nobel portfolio" dashboard hero
     },
     "libertex_lite": {
         "max_assets":         50,
@@ -65,6 +66,7 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "ai_strategy_naming": True,    # Max Sharpe shown as "AI choice"
         "hide_backtest":      True,    # no Backtest page in the gift build
         "hide_compare":       True,    # no Compare page in the gift build
+        "nobel_hero":         True,    # "Create your own Nobel portfolio!" hero
     },
 }
 

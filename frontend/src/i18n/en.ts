@@ -42,6 +42,10 @@ export const en = {
     hero_title_pre: "Build optimized portfolios with the",
     hero_title_em: "Markowitz mean-variance engine",
     hero_title_post: ".",
+    hero_nobel_pre: "Create your own ",
+    hero_nobel_em: "Nobel portfolio",
+    hero_nobel_post: "!",
+    hero_nobel_subtitle: "Based on the mathematical model of Nobel laureate Harry Markowitz",
     hero_subtitle:
       "Monthly historical data, 20-year horizon, Ledoit-Wolf shrinkage, full {broker} instrument catalogue. Efficient frontier · Monte Carlo · benchmark comparison · PDF/Excel export.",
     build_new: "Build New Portfolio",

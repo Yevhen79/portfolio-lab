@@ -14,6 +14,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const t = useT();
   const hideCompare = useConfig((s) => s.config?.features?.hide_compare ?? false);
+  const nobelHero = useConfig((s) => s.config?.features?.nobel_hero ?? false);
   const [items, setItems] = useState<PortfolioListItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -43,9 +44,15 @@ export default function Dashboard() {
             <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {t.dashboard.welcome}, {user?.name}
           </div>
           <h1 className="text-2xl sm:text-4xl font-bold mt-2 sm:mt-3 leading-tight max-w-3xl">
-            {t.dashboard.hero_title_pre} <span className="neon-text">{t.dashboard.hero_title_em}</span>{t.dashboard.hero_title_post}
+            {nobelHero ? (
+              <>{t.dashboard.hero_nobel_pre}<span className="neon-text">{t.dashboard.hero_nobel_em}</span>{t.dashboard.hero_nobel_post}</>
+            ) : (
+              <>{t.dashboard.hero_title_pre} <span className="neon-text">{t.dashboard.hero_title_em}</span>{t.dashboard.hero_title_post}</>
+            )}
           </h1>
-          <p className="text-xs sm:text-base text-text-muted mt-2 sm:mt-3 max-w-2xl">{t.dashboard.hero_subtitle}</p>
+          <p className="text-xs sm:text-base text-text-muted mt-2 sm:mt-3 max-w-2xl">
+            {nobelHero ? t.dashboard.hero_nobel_subtitle : t.dashboard.hero_subtitle}
+          </p>
           <div className="mt-4 sm:mt-6 flex flex-wrap gap-2 sm:gap-3">
             <Link to="/build" className="btn-primary inline-flex items-center gap-2 text-sm">
               <Plus className="w-4 h-4" /> {t.dashboard.build_new}

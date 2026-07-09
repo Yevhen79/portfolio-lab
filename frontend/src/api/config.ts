@@ -32,6 +32,7 @@ export interface AppConfig {
     ai_strategy_naming: boolean;
     hide_backtest: boolean;
     hide_compare: boolean;
+    nobel_hero: boolean;
   };
 }
 
