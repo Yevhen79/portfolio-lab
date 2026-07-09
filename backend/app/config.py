@@ -50,6 +50,7 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "hide_history":       False,   # hide History page + nav (merged into dashboard)
         "advanced_collapsed": False,   # advanced panel collapsed + curated defaults
         "hide_cov_method":    False,   # hide covariance-estimator picker (force LW)
+        "hide_universe_presets": False,  # hide "All available"/"MT only" quick buttons
     },
     "libertex_lite": {
         # Universe + history caps match the full engine — the gift build shows
@@ -79,6 +80,7 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "hide_history":       True,    # history lives on the dashboard now
         "advanced_collapsed": True,    # collapse advanced panel + curated defaults
         "hide_cov_method":    True,    # always Ledoit-Wolf; hide the picker
+        "hide_universe_presets": True,  # slider only; no preset shortcut buttons
     },
 }
 

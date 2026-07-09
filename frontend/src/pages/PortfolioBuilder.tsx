@@ -162,6 +162,7 @@ export default function PortfolioBuilder() {
   // defaults, hidden covariance picker) so casual users don't fiddle.
   const advancedCollapsed = cfgFeatures?.advanced_collapsed ?? false;
   const hideCovMethod = cfgFeatures?.hide_cov_method ?? false;
+  const hideUniversePresets = cfgFeatures?.hide_universe_presets ?? false;
   // Advanced-panel expand/collapse. Only shown as collapsible in editions that
   // set `advanced_collapsed`; the full build always renders it open.
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -878,7 +879,9 @@ export default function PortfolioBuilder() {
                     (effectively the full catalogue, ranking step is a
                     no-op). "Только MT" is a toggle on a separate boolean —
                     restricts the universe to MetaTrader-tradeable
-                    instruments. Active state shown with the cyan inset. */}
+                    instruments. Active state shown with the cyan inset.
+                    Hidden in the libertex build (slider only). */}
+                {!hideUniversePresets && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <button
                     type="button"
@@ -904,6 +907,7 @@ export default function PortfolioBuilder() {
                     {t.builder.mt_only_label}
                   </button>
                 </div>
+                )}
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1.5">
