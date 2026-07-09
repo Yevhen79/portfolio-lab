@@ -51,6 +51,7 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "advanced_collapsed": False,   # advanced panel collapsed + curated defaults
         "hide_cov_method":    False,   # hide covariance-estimator picker (force LW)
         "hide_universe_presets": False,  # hide "All available"/"MT only" quick buttons
+        "hide_sparsify":      False,   # hide the sparsify control (keep default on)
     },
     "libertex_lite": {
         # Universe + history caps match the full engine — the gift build shows
@@ -81,6 +82,7 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "advanced_collapsed": True,    # collapse advanced panel + curated defaults
         "hide_cov_method":    True,    # always Ledoit-Wolf; hide the picker
         "hide_universe_presets": True,  # slider only; no preset shortcut buttons
+        "hide_sparsify":      True,    # sparsify runs at the curated default, no UI
     },
 }
 

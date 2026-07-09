@@ -163,6 +163,7 @@ export default function PortfolioBuilder() {
   const advancedCollapsed = cfgFeatures?.advanced_collapsed ?? false;
   const hideCovMethod = cfgFeatures?.hide_cov_method ?? false;
   const hideUniversePresets = cfgFeatures?.hide_universe_presets ?? false;
+  const hideSparsify = cfgFeatures?.hide_sparsify ?? false;
   // Advanced-panel expand/collapse. Only shown as collapsible in editions that
   // set `advanced_collapsed`; the full build always renders it open.
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -1006,6 +1007,7 @@ export default function PortfolioBuilder() {
                 </select>
               </div>
               )}
+              {!hideSparsify && (
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs uppercase tracking-wide text-text-muted inline-flex items-center">
@@ -1024,6 +1026,7 @@ export default function PortfolioBuilder() {
                   onChange={(e) => update("sparsify_threshold", Number(e.target.value))}
                   className="w-full accent-cyan" />
               </div>
+              )}
             </div>
             )}
           </Section>

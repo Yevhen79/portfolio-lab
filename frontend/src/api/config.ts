@@ -38,6 +38,7 @@ export interface AppConfig {
     advanced_collapsed: boolean;
     hide_cov_method: boolean;
     hide_universe_presets: boolean;
+    hide_sparsify: boolean;
   };
 }
 
