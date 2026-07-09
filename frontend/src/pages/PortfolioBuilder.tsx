@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertCircle, Ban, Check, Loader2, Play, Plus, Save, Target, X } from "lucide-react";
+import { AlertCircle, Ban, Check, Loader2, Minus, Play, Plus, Save, Target, X } from "lucide-react";
 
 import { errorMessage } from "../api/client";
 import * as portfoliosApi from "../api/portfolios";
@@ -158,6 +158,13 @@ export default function PortfolioBuilder() {
   const forceSwaps = cfgFeatures?.force_swaps ?? false;
   const hideMinVariance = cfgFeatures?.hide_min_variance ?? false;
   const aiNaming = cfgFeatures?.ai_strategy_naming ?? false;
+  // Libertex gift build: the advanced panel is collapsed by default (curated
+  // defaults, hidden covariance picker) so casual users don't fiddle.
+  const advancedCollapsed = cfgFeatures?.advanced_collapsed ?? false;
+  const hideCovMethod = cfgFeatures?.hide_cov_method ?? false;
+  // Advanced-panel expand/collapse. Only shown as collapsible in editions that
+  // set `advanced_collapsed`; the full build always renders it open.
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   function update<K extends keyof OptimizeRequest>(k: K, v: OptimizeRequest[K]) {
     setReq((r) => ({ ...r, [k]: v }));
@@ -176,6 +183,25 @@ export default function PortfolioBuilder() {
       update("portfolio_type", "max_sharpe");
     }
   }, [hideMinVariance, req.portfolio_type]);
+
+  // Libertex gift build ships a curated set of advanced defaults (full 1500
+  // universe, 25y history, aggressive 5% sparsification) so the collapsed
+  // panel is already tuned. Applied once, on a fresh form only — a restored
+  // session keeps whatever the user last chose. Config loads async, so this
+  // fires when `advanced_collapsed` flips true.
+  const appliedGiftDefaults = useRef(false);
+  useEffect(() => {
+    if (appliedGiftDefaults.current || !advancedCollapsed) return;
+    appliedGiftDefaults.current = true;
+    if (persisted) return; // respect the restored session
+    setReq((r) => ({
+      ...r,
+      max_assets_in_universe: 1500,
+      history_years: 25,
+      sparsify: true,
+      sparsify_threshold: 0.05,
+    }));
+  }, [advancedCollapsed]);
 
   // The `override` argument lets us re-run with a freshly-computed exclusion
   // list without waiting for React's state batch to flush. `setReq` + reading
@@ -793,14 +819,28 @@ export default function PortfolioBuilder() {
           </Section>
 
           <Section
-            title={t.builder.advanced_title}
+            title={advancedCollapsed ? t.builder.advanced_settings_title : t.builder.advanced_title}
             subtitle={t.builder.advanced_subtitle}
             help={
               <HelpTip title={t.builder.advanced_help_title}>
                 {t.builder.advanced_help_body}
               </HelpTip>
             }
+            action={
+              advancedCollapsed ? (
+                <button
+                  type="button"
+                  onClick={() => setAdvancedOpen((o) => !o)}
+                  aria-expanded={advancedOpen}
+                  aria-label={t.builder.advanced_settings_title}
+                  className="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-border text-text-muted hover:text-cyan hover:border-cyan transition-colors"
+                >
+                  {advancedOpen ? <Minus className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                </button>
+              ) : undefined
+            }
           >
+            {(!advancedCollapsed || advancedOpen) && (
             <div className="space-y-3 text-sm">
               <div>
                 <div className="flex items-center justify-between mb-1.5">
@@ -938,6 +978,7 @@ export default function PortfolioBuilder() {
                   onChange={(e) => update("history_years", Number(e.target.value))}
                   className="w-full accent-cyan" />
               </div>
+              {!hideCovMethod && (
               <div>
                 <label className="block text-xs uppercase tracking-wide text-text-muted mb-1.5 inline-flex items-center">
                   {t.builder.cov_method_label}
@@ -960,6 +1001,7 @@ export default function PortfolioBuilder() {
                   <option value="ewma">{t.builder.cov_method_ewma}</option>
                 </select>
               </div>
+              )}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs uppercase tracking-wide text-text-muted inline-flex items-center">
@@ -979,6 +1021,7 @@ export default function PortfolioBuilder() {
                   className="w-full accent-cyan" />
               </div>
             </div>
+            )}
           </Section>
 
           {/* Big primary action button */}

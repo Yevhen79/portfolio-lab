@@ -144,6 +144,7 @@ export const en = {
     cat_fx: "FX",
     cat_etf: "ETF",
     advanced_title: "Advanced",
+    advanced_settings_title: "Advanced Settings",
     advanced_subtitle: "Estimation and filtering.",
     advanced_help_title: "Advanced settings",
     advanced_help_body:

@@ -35,6 +35,8 @@ export interface AppConfig {
     nobel_hero: boolean;
     dashboard_table: boolean;
     hide_history: boolean;
+    advanced_collapsed: boolean;
+    hide_cov_method: boolean;
   };
 }
 

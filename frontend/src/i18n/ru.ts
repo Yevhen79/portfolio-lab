@@ -150,6 +150,7 @@ export const ru: Strings = {
     cat_fx: "FX",
     cat_etf: "ETF",
     advanced_title: "Расширенно",
+    advanced_settings_title: "Расширенные Настройки",
     advanced_subtitle: "Оценка параметров и фильтрация.",
     advanced_help_title: "Расширенные настройки",
     advanced_help_body:

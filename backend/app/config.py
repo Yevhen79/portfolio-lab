@@ -48,9 +48,15 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "nobel_hero":         False,   # consumer "Nobel portfolio" dashboard hero
         "dashboard_table":    False,   # render dashboard portfolios as a table
         "hide_history":       False,   # hide History page + nav (merged into dashboard)
+        "advanced_collapsed": False,   # advanced panel collapsed + curated defaults
+        "hide_cov_method":    False,   # hide covariance-estimator picker (force LW)
     },
     "libertex_lite": {
-        "max_assets":         50,
+        # Universe + history caps match the full engine — the gift build shows
+        # the whole ~1500-instrument catalogue and up to 25y history (curated as
+        # the collapsed-panel defaults below). The IP gating stays via the
+        # feature toggles (Black-Litterman, broker API, advanced metrics).
+        "max_assets":         1500,
         "advanced_metrics":   False,
         "black_litterman":    False,
         "monte_carlo":        False,
@@ -59,7 +65,7 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "export_formats":     ["pdf"],
         "cov_methods":        ["ledoit_wolf"],
         "geometric_mean":     True,    # still show CAGR — basic sanity, no IP
-        "history_max_years":  10,
+        "history_max_years":  25,
         "monte_carlo_sims":   1000,
         # Simplified, consumer-friendly UI for the Libertex gift build.
         "hide_swaps_ui":      True,    # swaps are always on; no toggle shown
@@ -71,6 +77,8 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "nobel_hero":         True,    # "Create your own Nobel portfolio!" hero
         "dashboard_table":    True,    # sortable table beats cards for comparison
         "hide_history":       True,    # history lives on the dashboard now
+        "advanced_collapsed": True,    # collapse advanced panel + curated defaults
+        "hide_cov_method":    True,    # always Ledoit-Wolf; hide the picker
     },
 }
 
