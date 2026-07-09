@@ -1,6 +1,7 @@
 import { Activity, AlertTriangle, BarChart3, DollarSign, Shield, TrendingDown, TrendingUp, Zap } from "lucide-react";
 
 import { useT, tpl } from "../i18n";
+import { useConfig } from "../store/config";
 import { fmtNum, fmtPct, fmtUSD } from "../utils/format";
 import MetricCard from "./MetricCard";
 
@@ -21,6 +22,9 @@ interface Props {
 
 export default function PortfolioMetrics({ data }: Props) {
   const t = useT();
+  // Libertex gift build shows a leaner result set — no CAGR, Sortino, or
+  // risk-free-rate cards (false in the full edition).
+  const hideExtra = useConfig((s) => s.config?.features?.hide_extra_metrics ?? false);
   const expectedValue = data.initial_capital * (1 + data.expected_return_annual);
   const cagr = data.cagr_annual ?? null;
   const cagrValue = cagr !== null ? data.initial_capital * (1 + cagr) : null;
@@ -36,7 +40,7 @@ export default function PortfolioMetrics({ data }: Props) {
         tone={data.expected_return_annual > 0 ? "positive" : "negative"}
         tooltip={t.metrics.expected_return_tooltip}
       />
-      {cagr !== null && (
+      {!hideExtra && cagr !== null && (
         <MetricCard
           label="CAGR (geometric)"
           value={fmtPct(cagr)}
@@ -68,14 +72,16 @@ export default function PortfolioMetrics({ data }: Props) {
         tone={data.sharpe_ratio >= 1 ? "positive" : data.sharpe_ratio >= 0.5 ? "cyan" : "default"}
         tooltip={t.metrics.sharpe_tooltip}
       />
-      <MetricCard
-        label={t.metrics.sortino}
-        value={fmtNum(data.sortino_ratio, 3)}
-        hint={t.metrics.sortino_hint}
-        icon={<Shield className="w-4 h-4" />}
-        tone={data.sortino_ratio >= 1 ? "positive" : "default"}
-        tooltip={t.metrics.sortino_tooltip}
-      />
+      {!hideExtra && (
+        <MetricCard
+          label={t.metrics.sortino}
+          value={fmtNum(data.sortino_ratio, 3)}
+          hint={t.metrics.sortino_hint}
+          icon={<Shield className="w-4 h-4" />}
+          tone={data.sortino_ratio >= 1 ? "positive" : "default"}
+          tooltip={t.metrics.sortino_tooltip}
+        />
+      )}
       <MetricCard
         label={t.metrics.var_95}
         value={fmtPct(data.var_95_annual)}
@@ -100,13 +106,15 @@ export default function PortfolioMetrics({ data }: Props) {
         tone="negative"
         tooltip={t.metrics.max_dd_tooltip}
       />
-      <MetricCard
-        label={t.metrics.rfr}
-        value={fmtPct(data.risk_free_rate)}
-        hint={t.metrics.rfr_hint}
-        icon={<DollarSign className="w-4 h-4" />}
-        tooltip={t.metrics.rfr_tooltip}
-      />
+      {!hideExtra && (
+        <MetricCard
+          label={t.metrics.rfr}
+          value={fmtPct(data.risk_free_rate)}
+          hint={t.metrics.rfr_hint}
+          icon={<DollarSign className="w-4 h-4" />}
+          tooltip={t.metrics.rfr_tooltip}
+        />
+      )}
     </div>
   );
 }

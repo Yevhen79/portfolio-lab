@@ -39,6 +39,7 @@ export interface AppConfig {
     hide_cov_method: boolean;
     hide_universe_presets: boolean;
     hide_sparsify: boolean;
+    hide_extra_metrics: boolean;
   };
 }
 
