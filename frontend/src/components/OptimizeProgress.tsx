@@ -150,7 +150,7 @@ export default function OptimizeProgress({ busy, compact = false }: Props) {
   }
 
   return (
-    <div className="card-glow p-6 sm:p-8 relative overflow-hidden min-h-[460px]">
+    <div className="card p-6 sm:p-8 relative overflow-hidden min-h-[460px]">
       <div className="absolute -top-32 -right-32 w-64 h-64 rounded-full bg-cyan/10 blur-3xl pointer-events-none" />
       <div className="absolute -bottom-20 -left-20 w-48 h-48 rounded-full bg-magenta/10 blur-3xl pointer-events-none" />
 

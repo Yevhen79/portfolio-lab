@@ -37,7 +37,7 @@ export default function Register() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-bg bg-grid p-6">
-      <div className="card-glow p-10 w-full max-w-md animate-slide-up">
+      <div className="card-interactive p-10 w-full max-w-md animate-slide-up">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-neon-gradient flex items-center justify-center shadow-glow">

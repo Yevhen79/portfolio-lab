@@ -85,9 +85,9 @@ export default function PortfolioCompare() {
               <button
                 key={p.id}
                 onClick={() => add(p.id)}
-                className="card p-3 text-left hover:border-cyan transition-colors"
+                className="card-glow group p-3 text-left"
               >
-                <div className="font-medium truncate">{p.name}</div>
+                <div className="font-medium truncate group-hover:text-cyan transition-colors">{p.name}</div>
                 <div className="text-xs text-text-muted truncate">{p.owner_name}</div>
                 <div className="text-xs mt-1 text-cyan font-mono">{t.dashboard.sharpe_short} {fmtNum(p.sharpe_ratio, 2)}</div>
               </button>
@@ -150,7 +150,7 @@ export default function PortfolioCompare() {
                     [t.compare.metric_assets, (p: PortfolioOut) => `${p.weights.length}`],
                     [t.compare.metric_type, (p: PortfolioOut) => p.portfolio_type],
                   ].map(([label, fn], i) => (
-                    <tr key={i as number} className="border-t border-border">
+                    <tr key={i as number} className="border-t border-border row-hover">
                       <td className="px-4 py-3 text-text-muted">{label as string}</td>
                       {selected.map((p) => (
                         <td key={p.id} className="px-4 py-3 text-right font-mono">{(fn as any)(p)}</td>

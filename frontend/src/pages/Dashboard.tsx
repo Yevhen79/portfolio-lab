@@ -52,7 +52,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-4 sm:space-y-8">
       {/* Hero */}
-      <div className="card-glow p-5 sm:p-8 relative overflow-hidden">
+      <div className="card-interactive p-5 sm:p-8 relative overflow-hidden">
         <div className="absolute -top-32 -right-32 w-64 h-64 rounded-full bg-cyan/20 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-20 -left-20 w-48 h-48 rounded-full bg-magenta/15 blur-3xl pointer-events-none" />
         <div className="relative">
@@ -89,26 +89,26 @@ export default function Dashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        <div className="card-glow p-4 sm:p-5">
+        <div className="card-interactive p-4 sm:p-5">
           <div className="text-[10px] sm:text-[11px] uppercase tracking-widest text-text-dim font-medium flex items-center gap-1.5">
             <BarChart3 className="w-3.5 h-3.5" /> {t.dashboard.my_portfolios}
           </div>
           <div className="metric-value text-cyan mt-2">{myPortfolios.length}</div>
         </div>
-        <div className="card-glow p-4 sm:p-5">
+        <div className="card-interactive p-4 sm:p-5">
           <div className="text-[10px] sm:text-[11px] uppercase tracking-widest text-text-dim font-medium flex items-center gap-1.5">
             <GitCompare className="w-3.5 h-3.5" /> {t.dashboard.shared}
           </div>
           <div className="metric-value text-magenta mt-2">{sharedPortfolios.length}</div>
         </div>
-        <div className="card-glow p-4 sm:p-5">
+        <div className="card-interactive p-4 sm:p-5">
           <div className="text-[10px] sm:text-[11px] uppercase tracking-widest text-text-dim font-medium flex items-center gap-1.5">
             <Zap className="w-3.5 h-3.5" /> {t.dashboard.best_sharpe}
           </div>
           <div className="metric-value text-positive mt-2">{bestSharpe ? fmtNum(bestSharpe.sharpe_ratio, 2) : "—"}</div>
           {bestSharpe && <div className="text-xs text-text-muted truncate mt-0.5">{bestSharpe.name}</div>}
         </div>
-        <div className="card-glow p-4 sm:p-5">
+        <div className="card-interactive p-4 sm:p-5">
           <div className="text-[10px] sm:text-[11px] uppercase tracking-widest text-text-dim font-medium flex items-center gap-1.5">
             <TrendingUp className="w-3.5 h-3.5" /> {t.dashboard.quota_today}
           </div>
@@ -157,7 +157,7 @@ export default function Dashboard() {
                     key={f.v}
                     onClick={() => setFilter(f.v)}
                     className={`flex-1 px-2 sm:px-3 py-1.5 text-xs sm:text-sm rounded-lg capitalize transition-colors ${
-                      filter === f.v ? "bg-cyan/15 text-cyan" : "text-text-muted hover:text-text"
+                      filter === f.v ? "bg-cyan/15 text-cyan" : "text-text-muted hover:text-text hover:bg-bg-elevated/60"
                     }`}
                   >
                     {f.label}
@@ -190,7 +190,7 @@ export default function Dashboard() {
               <Link
                 key={p.id}
                 to={`/portfolio/${p.id}`}
-                className="card-glow p-5 group hover:scale-[1.01] transition-transform"
+                className="card-glow p-5 group"
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="font-semibold truncate text-text group-hover:text-cyan transition-colors">{p.name}</div>

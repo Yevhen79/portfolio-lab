@@ -263,10 +263,8 @@ export default function BacktestPage() {
                   key={b.v}
                   onClick={() => update("portfolio_type", b.v as OptimizeRequest["portfolio_type"])}
                   title={b.hint}
-                  className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all border ${
-                    req.portfolio_type === b.v
-                      ? "border-cyan bg-cyan/10 text-cyan shadow-glow"
-                      : "border-border text-text-muted hover:border-border-accent"
+                  className={`toggle-btn px-3 py-2.5 ${
+                    req.portfolio_type === b.v ? "toggle-btn-on" : "toggle-btn-idle"
                   }`}
                 >
                   {b.label}
@@ -294,7 +292,7 @@ export default function BacktestPage() {
                 role="switch"
                 aria-checked={req.apply_swaps ?? false}
                 onClick={() => update("apply_swaps", !req.apply_swaps)}
-                className={`shrink-0 inline-flex items-center h-7 w-12 rounded-full border transition-colors ${
+                className={`shrink-0 inline-flex items-center h-7 w-12 rounded-full border transition-colors hover:border-cyan/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan/40 ${
                   req.apply_swaps
                     ? "bg-cyan/20 border-cyan justify-end"
                     : "bg-bg-elevated border-border justify-start"
@@ -365,7 +363,7 @@ export default function BacktestPage() {
                 step={0.01}
                 value={req.target_return ?? 0.15}
                 onChange={(e) => update("target_return", Number(e.target.value))}
-                className="w-full accent-cyan h-2"
+                className="w-full h-2"
               />
               <div className="flex justify-between text-[11px] text-text-muted mt-1">
                 <span>5%</span><span>25%</span><span>50%</span>
@@ -401,7 +399,7 @@ export default function BacktestPage() {
                 step={0.01}
                 value={req.target_risk ?? 0.20}
                 onChange={(e) => update("target_risk", Number(e.target.value))}
-                className="w-full accent-cyan h-2"
+                className="w-full h-2"
               />
               <div className="flex justify-between text-[11px] text-text-muted mt-1">
                 <span>3%</span><span>30%</span><span>60%</span>
@@ -442,10 +440,8 @@ export default function BacktestPage() {
                     key={v}
                     onClick={() => update("risk_tolerance", v)}
                     title={hint}
-                    className={`px-2 py-2 rounded-lg text-xs font-medium transition-all border ${
-                      req.risk_tolerance === v
-                        ? "border-magenta bg-magenta/10 text-magenta"
-                        : "border-border text-text-muted hover:border-border-accent"
+                    className={`toggle-btn px-2 py-2 rounded-lg text-xs ${
+                      req.risk_tolerance === v ? "toggle-btn-on-alt" : "toggle-btn-idle-alt"
                     }`}
                   >
                     {label}
@@ -499,10 +495,8 @@ export default function BacktestPage() {
                         return { ...r, categories: next };
                       });
                     }}
-                    className={`px-2 py-2 rounded-lg text-xs font-medium transition-all border capitalize ${
-                      selected
-                        ? "border-cyan bg-cyan/10 text-cyan shadow-glow"
-                        : "border-border text-text-dim hover:border-border-accent"
+                    className={`toggle-btn px-2 py-2 rounded-lg text-xs capitalize ${
+                      selected ? "toggle-btn-on" : "toggle-btn-idle"
                     }`}
                   >
                     {t.builder[labelKey]}
@@ -610,7 +604,7 @@ export default function BacktestPage() {
                   step={1}
                   value={req.min_history_years}
                   onChange={(e) => update("min_history_years", Number(e.target.value))}
-                  className="w-full accent-cyan"
+                  className="w-full"
                 />
               </div>
               <div>
@@ -630,7 +624,7 @@ export default function BacktestPage() {
                   step={50}
                   value={Math.min(req.max_assets_in_universe, 1500)}
                   onChange={(e) => update("max_assets_in_universe", Number(e.target.value))}
-                  className="w-full accent-cyan"
+                  className="w-full"
                 />
                 <div className="flex justify-between text-[11px] text-text-muted mt-1">
                   <span>50</span><span>500</span><span>1500</span>
@@ -682,7 +676,7 @@ export default function BacktestPage() {
                   step={0.05}
                   value={req.max_weight_per_asset ?? 0.35}
                   onChange={(e) => update("max_weight_per_asset", Number(e.target.value))}
-                  className="w-full accent-cyan"
+                  className="w-full"
                 />
                 <div className="flex justify-between text-[11px] text-text-muted mt-1">
                   <span>10%</span><span>35%</span><span>{t.builder.max_weight_off}</span>
@@ -709,7 +703,7 @@ export default function BacktestPage() {
                   step={0.05}
                   value={req.max_drop_from_peak_pct ?? 0.60}
                   onChange={(e) => update("max_drop_from_peak_pct", Number(e.target.value))}
-                  className="w-full accent-cyan"
+                  className="w-full"
                 />
                 <div className="flex justify-between text-[11px] text-text-muted mt-1">
                   <span>30%</span><span>60%</span><span>{t.builder.drop_from_peak_off}</span>
@@ -732,7 +726,7 @@ export default function BacktestPage() {
                   step={1}
                   value={req.history_years}
                   onChange={(e) => update("history_years", Number(e.target.value))}
-                  className="w-full accent-cyan"
+                  className="w-full"
                 />
               </div>
               <div>
@@ -767,8 +761,8 @@ export default function BacktestPage() {
                   </label>
                   <button
                     onClick={() => update("sparsify", !req.sparsify)}
-                    className={`text-[10px] px-2 py-0.5 rounded-md ${
-                      req.sparsify ? "bg-cyan/20 text-cyan" : "bg-bg-elevated text-text-dim"
+                    className={`text-[10px] px-2 py-0.5 rounded-md transition-colors ${
+                      req.sparsify ? "bg-cyan/20 text-cyan hover:bg-cyan/30" : "bg-bg-elevated text-text-dim hover:text-text"
                     }`}
                   >
                     {req.sparsify ? "ON" : "OFF"}
@@ -781,7 +775,7 @@ export default function BacktestPage() {
                   step={0.001}
                   value={req.sparsify_threshold}
                   onChange={(e) => update("sparsify_threshold", Number(e.target.value))}
-                  className="w-full accent-cyan"
+                  className="w-full"
                 />
               </div>
             </div>
@@ -1062,7 +1056,7 @@ function CompareTable({ rows }: { rows: backtestApi.ComparisonRow[] }) {
             const Arrow = delta === null ? null : delta > 0 ? TrendingUp : TrendingDown;
             const tooltip = metricTooltip(row.metric);
             return (
-              <tr key={row.metric} className="border-t border-border">
+              <tr key={row.metric} className="border-t border-border row-hover">
                 <td
                   className="px-3 sm:px-4 py-3 text-text-muted"
                   title={tooltip}

@@ -55,14 +55,14 @@ export default function Navbar() {
   const desktopLinkClass = (p: string) =>
     `flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
       isActive(p)
-        ? "text-cyan bg-cyan/10 border border-cyan/30"
+        ? "text-cyan bg-cyan/10 border border-cyan/30 hover:bg-cyan/20"
         : "text-text-muted hover:text-text hover:bg-bg-elevated"
     }`;
 
   const mobileLinkClass = (p: string) =>
     `flex items-center gap-3 px-4 py-3 rounded-xl text-base transition-colors ${
       isActive(p)
-        ? "text-cyan bg-cyan/10 border border-cyan/30"
+        ? "text-cyan bg-cyan/10 border border-cyan/30 hover:bg-cyan/20"
         : "text-text-muted hover:text-text hover:bg-bg-elevated"
     }`;
 

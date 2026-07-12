@@ -45,50 +45,150 @@ body {
 ::-webkit-scrollbar-thumb {
   background: #2A3358;
   border-radius: 5px;
+  transition: background 0.2s ease;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #3A4570;
 }
 
 @layer components {
+  /* ---- SURFACES: 3-tier depth system --------------------------------- */
+
+  /* Tier 0 — STATIC. Pure display tiles + alert/progress banners. No hover,
+     so nothing non-interactive reads as clickable. */
   .card {
     @apply bg-bg-elevated/70 border border-border rounded-2xl backdrop-blur-md shadow-card;
   }
-  .card-glow {
-    @apply card hover:shadow-glow transition-shadow duration-300;
+
+  /* Tier 1 — SPOTLIGHT. Live-but-not-clickable panels (every Section, KPI
+     stat cards, hero/auth banners). Accent hairline ring + soft glow fade in;
+     NO lift -> never reads as a button, no layout jump. focus-within gives
+     keyboard users the same cue when a nested field is focused. */
+  .card-interactive {
+    @apply card transition-chrome duration-300 ease-out
+      hover:border-cyan/60
+      focus-within:border-cyan/40;
   }
+
+  /* Tier 2 — RAISE. Genuinely clickable cards (portfolio preview, compare
+     picker, result hero metric). Physically lifts, brighter ring, layered
+     depth+glow. Keyboard parity via focus-visible. */
+  .card-glow {
+    @apply card transition-depth duration-300 ease-out
+      hover:border-cyan/60 hover:-translate-y-0.5
+      focus-visible:outline-none focus-visible:border-cyan/60;
+  }
+
+  /* Interactive table/list ROW — faint accent wash + 3px spotlight left-edge.
+     Edge painted on the first cell via inset box-shadow so it renders under
+     border-collapse and causes zero layout shift. */
+  .row-hover {
+    @apply transition-colors duration-150 hover:bg-cyan/[0.06];
+  }
+  .row-hover:hover > :first-child {
+    box-shadow: inset 3px 0 0 0 rgb(var(--color-cyan));
+  }
+
+  /* ---- TEXT ---------------------------------------------------------- */
   .neon-text {
     background: linear-gradient(135deg, rgb(var(--color-cyan)) 0%, rgb(var(--color-magenta)) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
   }
+  /* Opt-in for neon-text used as a link / clickable heading (logo, brand).
+     background-clip gradients can't transition `color`, so brighten via filter. */
+  .neon-link {
+    @apply transition-[filter] duration-200;
+  }
+  .neon-link:hover {
+    filter: brightness(1.15) saturate(1.08);
+  }
+
+  /* ---- CONTROLS ------------------------------------------------------ */
+  /* PRIMARY — no more opacity-dim; brighten + glow-ramp + lift, press on click. */
   .btn-primary {
     @apply px-5 py-2.5 rounded-xl font-medium text-bg
-      bg-gradient-to-r from-cyan to-magenta
-      hover:opacity-90 transition-opacity
-      shadow-glow disabled:opacity-50 disabled:cursor-not-allowed;
+      bg-gradient-to-r from-cyan to-magenta shadow-glow
+      transition-[transform,box-shadow,filter] duration-200 ease-out
+      hover:-translate-y-px hover:shadow-glow-strong hover:brightness-110
+      active:translate-y-0 active:scale-[0.98] active:brightness-100
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan/50
+      focus-visible:ring-offset-2 focus-visible:ring-offset-bg
+      disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none
+      disabled:hover:translate-y-0 disabled:hover:brightness-100;
   }
+  /* GHOST — grey hover replaced with a themed accent tint + faint glow. */
   .btn-ghost {
     @apply px-4 py-2 rounded-xl font-medium text-text border border-border
-      hover:border-border-accent hover:bg-bg-elevated transition-all
+      transition-chrome duration-200 ease-out
+      hover:border-cyan/50 hover:bg-cyan/5 hover:text-cyan hover:shadow-glow-sm
+      active:scale-[0.98]
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan/40
+      focus-visible:ring-offset-2 focus-visible:ring-offset-bg
       disabled:opacity-40 disabled:cursor-not-allowed;
   }
+  /* DANGER — border brightens to full red + faint red glow + press. */
   .btn-danger {
     @apply px-4 py-2 rounded-xl font-medium text-red border border-red/40
-      hover:bg-red/10 transition-all;
+      transition-chrome duration-200 ease-out
+      hover:bg-red/10 hover:border-red hover:shadow-glow-red
+      active:scale-[0.98]
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red/40
+      focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
   }
+  /* INPUT — pre-focus hover border; transition scoped (was transition-all). */
   .input {
     @apply w-full px-4 py-2.5 rounded-xl bg-bg-elevated border border-border
       text-text placeholder:text-text-dim
-      focus:outline-none focus:border-cyan focus:ring-2 focus:ring-cyan/30
-      transition-all;
+      transition-[border-color,box-shadow] duration-200 ease-out
+      hover:border-border-accent
+      focus:outline-none focus:border-cyan focus:ring-2 focus:ring-cyan/30;
   }
-  .badge {
-    @apply px-2.5 py-1 text-xs font-semibold rounded-full;
+
+  .badge { @apply px-2.5 py-1 text-xs font-semibold rounded-full; }
+  .metric-value { @apply font-mono text-2xl font-bold tracking-tight; }
+
+  /* ---- REUSABLE TOGGLE-BUTTON (strategy / category / risk grids) ------
+     DRY replacement for the repeated inline ternaries. `-alt` = magenta
+     variant for the risk-tolerance grid (mirrors its magenta selected accent).
+     Compose with per-instance padding, e.g. `toggle-btn px-3 py-2.5`. */
+  .toggle-btn {
+    @apply rounded-xl text-sm font-medium border
+      transition-chrome duration-200 ease-out
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan/40;
   }
-  .metric-value {
-    @apply font-mono text-2xl font-bold tracking-tight;
+  .toggle-btn-idle { @apply border-border text-text-muted hover:border-cyan/50 hover:text-cyan hover:bg-cyan/5; }
+  .toggle-btn-on   { @apply border-cyan bg-cyan/10 text-cyan shadow-glow; }
+  .toggle-btn-idle-alt { @apply border-border text-text-muted hover:border-magenta/50 hover:text-magenta hover:bg-magenta/5; }
+  .toggle-btn-on-alt   { @apply border-magenta bg-magenta/10 text-magenta shadow-glow-magenta; }
+}
+
+/* Tunable spotlight/raise shadows for the surface tiers. Kept as raw CSS (not
+   Tailwind shadow tokens) so value tweaks hot-reload via index.css instead of
+   needing a dev-server restart. Every layer uses rgb(var(--color-cyan)/a) so a
+   data-theme flip re-skins the ring/glow to the Libertex gold/orange. */
+.card-interactive:hover,
+.card-interactive:focus-within {
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgb(var(--color-cyan) / 0.55),
+    0 0 28px rgb(var(--color-cyan) / 0.30);
+}
+.card-glow:hover,
+.card-glow:focus-visible {
+  box-shadow:
+    0 16px 40px -8px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgb(var(--color-cyan) / 0.55),
+    0 0 34px rgb(var(--color-cyan) / 0.34);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-glow:hover,
+  .card-glow:focus-visible {
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgb(var(--color-cyan) / 0.55),
+      0 0 28px rgb(var(--color-cyan) / 0.30);
   }
 }
 
@@ -129,4 +229,66 @@ body {
 .js-plotly-plot .nsewdrag,
 .js-plotly-plot .drag {
   touch-action: pan-y !important;
+}
+
+/* ---- GLOBAL: themed neon range sliders (covers all sliders at once) ----
+   Replaces the tiny native accent-cyan thumb with a themed thumb that grows
+   + glows on hover/active/focus. Animates transform + box-shadow only. */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  background: rgb(var(--color-cyan) / 0.15);
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: rgb(var(--color-cyan));
+  box-shadow: 0 0 0 4px rgb(var(--color-cyan) / 0.12);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+input[type="range"]:hover::-webkit-slider-thumb,
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 6px rgb(var(--color-cyan) / 0.20), 0 0 12px rgb(var(--color-cyan) / 0.55);
+}
+input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.18); }
+input[type="range"]::-moz-range-track {
+  height: 6px; border-radius: 9999px; background: rgb(var(--color-cyan) / 0.15);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 16px; height: 16px; border: none; border-radius: 9999px;
+  background: rgb(var(--color-cyan));
+  box-shadow: 0 0 0 4px rgb(var(--color-cyan) / 0.12);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+input[type="range"]:hover::-moz-range-thumb,
+input[type="range"]:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 6px rgb(var(--color-cyan) / 0.20), 0 0 12px rgb(var(--color-cyan) / 0.55);
+}
+input[type="range"]:active::-moz-range-thumb { transform: scale(1.18); }
+
+/* ---- ACCESSIBILITY: global reduced-motion guard ----
+   Neutralizes the infinite pulse-glow, slide-up entrance, every transition,
+   and strips the physical lift/press transforms — while KEEPING the color /
+   border / glow spotlight, which reads instantly with no movement. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .card-glow:hover,
+  .card-glow:focus-visible,
+  .btn-primary:hover, .btn-primary:active,
+  .btn-ghost:active, .btn-danger:active,
+  input[type="range"]:active::-webkit-slider-thumb,
+  input[type="range"]:active::-moz-range-thumb {
+    transform: none !important;
+  }
 }

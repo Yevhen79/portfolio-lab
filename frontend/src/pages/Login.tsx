@@ -36,7 +36,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-bg bg-grid p-4 sm:p-6">
-      <div className="card-glow p-6 sm:p-10 w-full max-w-md animate-slide-up">
+      <div className="card-interactive p-6 sm:p-10 w-full max-w-md animate-slide-up">
         <div className="flex items-center justify-between mb-6 sm:mb-8 gap-2">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-neon-gradient flex items-center justify-center shadow-glow shrink-0">

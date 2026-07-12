@@ -62,6 +62,19 @@ export default {
         "glow-magenta": "0 0 40px rgb(var(--color-magenta) / 0.25)",
         "glow-green": "0 0 30px rgba(0, 255, 148, 0.3)",
         card: "0 8px 32px rgba(0, 0, 0, 0.4)",
+        // --- interactivity system ---
+        "glow-sm": "0 0 16px rgb(var(--color-cyan) / 0.20)",       // btn-ghost hover
+        "glow-strong": "0 0 44px rgb(var(--color-cyan) / 0.45)",   // btn-primary hover ramp
+        "glow-red": "0 0 24px rgba(255, 59, 92, 0.35)",            // btn-danger hover (semantic, non-theming)
+        // Tier-1 SPOTLIGHT: depth drop + accent ring + soft glow (clearly visible, still tasteful)
+        spot: "0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgb(var(--color-cyan) / 0.55), 0 0 28px rgb(var(--color-cyan) / 0.30)",
+        // Tier-2 RAISE: deeper drop + brighter ring + stronger glow
+        lift: "0 16px 40px -8px rgba(0,0,0,0.55), 0 0 0 1px rgb(var(--color-cyan) / 0.55), 0 0 34px rgb(var(--color-cyan) / 0.34)",
+      },
+      transitionProperty: {
+        // Scoped, compositor-cheap replacements for `transition-all` on controls.
+        chrome: "color, background-color, border-color, box-shadow",
+        depth: "transform, border-color, box-shadow",
       },
       backgroundImage: {
         "grid-pattern":

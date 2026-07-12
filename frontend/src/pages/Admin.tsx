@@ -166,10 +166,10 @@ export default function Admin() {
                     <div className="text-[10px] text-text-dim mt-1">{tpl(t.admin.registered, { date: fmtDate(u.created_at) })}</div>
                   </div>
                   <div className="flex gap-1">
-                    <button onClick={() => approveUser(u.id)} className="p-2 rounded-lg hover:bg-positive/10 text-positive" title="Approve">
+                    <button onClick={() => approveUser(u.id)} className="p-2 rounded-lg hover:bg-positive/10 text-positive transition-colors" title="Approve">
                       <CheckCircle2 className="w-4 h-4" />
                     </button>
-                    <button onClick={() => deleteUser(u.id)} className="p-2 rounded-lg hover:bg-red/10 text-red" title="Reject">
+                    <button onClick={() => deleteUser(u.id)} className="p-2 rounded-lg hover:bg-red/10 text-red transition-colors" title="Reject">
                       <XCircle className="w-4 h-4" />
                     </button>
                   </div>
@@ -195,10 +195,10 @@ export default function Admin() {
                     {r.reason && <div className="text-xs text-text-muted mt-1 italic">"{r.reason}"</div>}
                   </div>
                   <div className="flex gap-1">
-                    <button onClick={() => decideRequest(r.id, true)} className="p-2 rounded-lg hover:bg-positive/10 text-positive" title="Approve">
+                    <button onClick={() => decideRequest(r.id, true)} className="p-2 rounded-lg hover:bg-positive/10 text-positive transition-colors" title="Approve">
                       <CheckCircle2 className="w-4 h-4" />
                     </button>
-                    <button onClick={() => decideRequest(r.id, false)} className="p-2 rounded-lg hover:bg-red/10 text-red" title="Deny">
+                    <button onClick={() => decideRequest(r.id, false)} className="p-2 rounded-lg hover:bg-red/10 text-red transition-colors" title="Deny">
                       <XCircle className="w-4 h-4" />
                     </button>
                   </div>
@@ -286,10 +286,10 @@ export default function Admin() {
                         <span className="text-text-dim text-xs">—</span>
                       ) : editing === u.id ? (
                         <div className="flex gap-1 justify-end">
-                          <button onClick={() => saveEdit(u.id)} className="text-positive hover:bg-positive/10 p-1.5 rounded">
+                          <button onClick={() => saveEdit(u.id)} className="text-positive hover:bg-positive/10 p-1.5 rounded transition-colors">
                             <CheckCircle2 className="w-4 h-4" />
                           </button>
-                          <button onClick={() => setEditing(null)} className="text-text-muted hover:bg-bg-elevated p-1.5 rounded">
+                          <button onClick={() => setEditing(null)} className="text-text-muted hover:bg-bg-elevated p-1.5 rounded transition-colors">
                             <XCircle className="w-4 h-4" />
                           </button>
                         </div>
@@ -300,22 +300,22 @@ export default function Admin() {
                               setEditing(u.id);
                               setEditValues({ daily_limit: u.daily_limit, weekly_limit: u.weekly_limit });
                             }}
-                            className="text-text-muted hover:text-cyan hover:bg-cyan/10 p-1.5 rounded"
+                            className="text-text-muted hover:text-cyan hover:bg-cyan/10 p-1.5 rounded transition-colors"
                             title="Edit limits"
                           >
                             <UserPlus className="w-4 h-4" />
                           </button>
                           {u.status === "pending" && (
-                            <button onClick={() => approveUser(u.id)} className="text-positive hover:bg-positive/10 p-1.5 rounded" title="Approve">
+                            <button onClick={() => approveUser(u.id)} className="text-positive hover:bg-positive/10 p-1.5 rounded transition-colors" title="Approve">
                               <CheckCircle2 className="w-4 h-4" />
                             </button>
                           )}
                           {u.status !== "blocked" && (
-                            <button onClick={() => blockUser(u.id)} className="text-amber hover:bg-amber/10 p-1.5 rounded" title="Block">
+                            <button onClick={() => blockUser(u.id)} className="text-amber hover:bg-amber/10 p-1.5 rounded transition-colors" title="Block">
                               <ShieldOff className="w-4 h-4" />
                             </button>
                           )}
-                          <button onClick={() => deleteUser(u.id)} className="text-red hover:bg-red/10 p-1.5 rounded" title="Delete">
+                          <button onClick={() => deleteUser(u.id)} className="text-red hover:bg-red/10 p-1.5 rounded transition-colors" title="Delete">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -344,7 +344,7 @@ export default function Admin() {
             </thead>
             <tbody>
               {requests.map((r) => (
-                <tr key={r.id} className="border-t border-border">
+                <tr key={r.id} className="border-t border-border row-hover">
                   <td className="px-4 py-3">{r.user_name}</td>
                   <td className="px-4 py-3 text-text-muted text-xs italic">{r.reason || "—"}</td>
                   <td className="px-4 py-3 text-right font-mono text-cyan">+{r.requested_amount}</td>

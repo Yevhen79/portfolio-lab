@@ -11,7 +11,7 @@ interface Props {
 
 export default function Section({ title, subtitle, children, action, className = "", help }: Props) {
   return (
-    <section className={`card p-4 sm:p-6 ${className}`}>
+    <section className={`card-interactive p-4 sm:p-6 ${className}`}>
       {/* On phones the `action` slot (search box, filters, snap-buttons) drops
           to its own row below the title — at < 420 px the two flex children
           collide otherwise. From `xs:` up they sit side-by-side. */}

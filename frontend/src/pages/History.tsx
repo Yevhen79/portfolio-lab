@@ -68,7 +68,7 @@ export default function History() {
                   key={f.v}
                   onClick={() => setFilter(f.v)}
                   className={`flex-1 px-2 sm:px-3 py-1.5 text-xs sm:text-sm rounded-lg capitalize transition-colors ${
-                    filter === f.v ? "bg-cyan/15 text-cyan" : "text-text-muted hover:text-text"
+                    filter === f.v ? "bg-cyan/15 text-cyan" : "text-text-muted hover:text-text hover:bg-bg-elevated/60"
                   }`}
                 >
                   {f.label}
