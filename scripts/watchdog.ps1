@@ -23,6 +23,8 @@ $wlog = Join-Path $logDir "watchdog.log"
 
 $CHECK_INTERVAL = 30   # seconds between health checks
 $NGROK_DOMAIN = "portfolio-lab-yevhen.ngrok-free.dev"
+# Absolute path to the ngrok config that holds the authtoken (see Restart-Ngrok).
+$NGROK_CONFIG = "C:\Users\Admin\AppData\Local\ngrok\ngrok.yml"
 
 function Log($msg) {
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -34,8 +36,17 @@ function Log($msg) {
 # command that merely MENTIONS "watchdog.ps1" matches and produces a false
 # "already running" positive, so the real watchdog kept exiting on startup.
 # A named mutex is race-free and auto-releases when this process dies.
+#
+# GLOBAL namespace (not Local\): the scheduled task can fire in a different
+# session than an already-running interactive watchdog (e.g. after a sleep/wake
+# before interactive logon). A session-local mutex wouldn't see the other one,
+# so TWO watchdogs would run and both restart ngrok — and the free tier allows
+# only ONE agent session, so they'd fight endlessly (ERR_NGROK auth/limit +
+# constant tunnel churn). Global\ enforces a single watchdog machine-wide. All
+# instances run as the same user (the task has no /ru SYSTEM), so there are no
+# cross-user ACL issues opening the global mutex.
 $me = $PID
-$script:_mutex = New-Object System.Threading.Mutex($false, "Local\PortfolioLabWatchdog")
+$script:_mutex = New-Object System.Threading.Mutex($false, "Global\PortfolioLabWatchdog")
 $acquired = $false
 try { $acquired = $script:_mutex.WaitOne(0) } catch { $acquired = $true }  # AbandonedMutex = prior died -> we own it
 if (-not $acquired) {
@@ -113,10 +124,36 @@ function Restart-Ngrok {
     Get-Process ngrok -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     Start-Sleep -Milliseconds 800
     $lp = Join-Path $logDir "ngrok.log"
-    Start-Process -FilePath $ngrokExe `
-        -ArgumentList "http","--domain=$NGROK_DOMAIN","5173","--log=stdout" `
+    # Point ngrok at an EXPLICIT config path holding the authtoken. Without this
+    # ngrok reads %LOCALAPPDATA%\ngrok\ngrok.yml, which resolves differently
+    # depending on the launching context (scheduled task S4U token, a non-loaded
+    # profile, SYSTEM, etc.) — and if it can't find the token it dies instantly
+    # with ERR_NGROK_4018, so the watchdog just respawns a doomed process every
+    # cycle. An absolute --config makes auth deterministic regardless of context.
+    $ngrokArgs = @("http","--domain=$NGROK_DOMAIN","5173","--log=stdout")
+    if (Test-Path $NGROK_CONFIG) { $ngrokArgs += @("--config", $NGROK_CONFIG) }
+    Start-Process -FilePath $ngrokExe -ArgumentList $ngrokArgs `
         -WindowStyle Hidden -RedirectStandardOutput $lp -RedirectStandardError "$lp.err"
     Log "[ngrok] (re)started"
+}
+
+function Start-Libertex {
+    # Libertex edition (8001 backend + 5174 frontend). Delegated to
+    # run-libertex.ps1 so its env setup (EDITION=libertex, separate DB, CORS)
+    # lives in ONE place and stays idempotent (it skips a port already up).
+    #
+    # CRITICAL: launched in a CHILD powershell, NOT dot-sourced. run-libertex.ps1
+    # sets $env:EDITION=libertex, and env vars are process-global — dot-sourcing
+    # would poison THIS watchdog's environment, so the next Full backend restart
+    # would inherit EDITION=libertex and serve the wrong edition on :8000/ngrok.
+    # A child process contains that pollution and dies immediately after.
+    $script = Join-Path $root "scripts\run-libertex.ps1"
+    if (-not (Test-Path $script)) { Log "[libertex] run-libertex.ps1 missing"; return }
+    $lp = Join-Path $logDir "libertex-launch.log"
+    Start-Process -FilePath "powershell.exe" `
+        -ArgumentList "-NonInteractive","-ExecutionPolicy","Bypass","-File",$script `
+        -WindowStyle Hidden -RedirectStandardOutput $lp -RedirectStandardError "$lp.err"
+    Log "[libertex] (re)started via run-libertex.ps1"
 }
 
 # ---------------------------- monitor loop ----------------------------
@@ -160,6 +197,19 @@ while ($true) {
             else {
                 $ngrokFails = 0
             }
+        }
+        # Libertex edition (8001 backend + 5174 frontend). Independent of the
+        # Full instance and its ngrok tunnel. Needles are edition-specific
+        # ("8001", "vite.libertex") so they NEVER match the Full processes —
+        # keeping this block from interfering with Full's own supervision. The
+        # cmdline fallback covers the cold-start window (process alive, port not
+        # yet bound) so we don't double-launch.
+        $libBackUp  = (Test-Port 8001) -or (Test-Cmdline "python.exe" "8001")
+        $libFrontUp = (Test-Port 5174) -or (Test-Cmdline "node.exe" "vite.libertex")
+        if (-not $libBackUp -or -not $libFrontUp) {
+            Log "[libertex] down (backend=$libBackUp frontend=$libFrontUp) -> starting"
+            Start-Libertex
+            Start-Sleep 12
         }
     } catch {
         Log "loop error: $_"
