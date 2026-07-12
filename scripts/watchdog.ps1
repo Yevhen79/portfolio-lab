@@ -69,9 +69,17 @@ function Test-Port([int]$port) {
     $null -ne (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
 }
 
-function Test-Cmdline([string]$procName, [string]$needle) {
+function Test-Cmdline([string]$procName, [string]$needle, [string]$exclude = $null) {
+    # $exclude lets a check target ONE edition's process: the Full and Libertex
+    # instances both run "uvicorn" and "vite", so an un-excluded needle matches
+    # either — which masked a dead Full service whenever Libertex was alive and
+    # left the Full frontend/backend unsupervised. Full checks exclude the
+    # Libertex port/config; Libertex checks use their own distinct needles.
     $hit = Get-CimInstance Win32_Process -Filter "Name='$procName'" -ErrorAction SilentlyContinue |
-        Where-Object { $_.CommandLine -and $_.CommandLine -like "*$needle*" }
+        Where-Object {
+            $_.CommandLine -and $_.CommandLine -like "*$needle*" -and
+            (-not $exclude -or $_.CommandLine -notlike "*$exclude*")
+        }
     return $null -ne $hit
 }
 
@@ -160,12 +168,14 @@ function Start-Libertex {
 $ngrokFails = 0   # consecutive public-URL failures (debounce against blips)
 while ($true) {
     try {
-        if (-not ((Test-Port 8000) -or (Test-Cmdline "python.exe" "uvicorn"))) {
+        # Full checks EXCLUDE the Libertex instance (:8001 backend, vite.libertex
+        # frontend) so a dead Full service isn't masked by a live Libertex one.
+        if (-not ((Test-Port 8000) -or (Test-Cmdline "python.exe" "uvicorn" "8001"))) {
             Log "[backend] DOWN -> starting"
             Start-Backend
             Start-Sleep 8   # give uvicorn its cold-start before the next checks
         }
-        if (-not ((Test-Port 5173) -or (Test-Cmdline "node.exe" "vite"))) {
+        if (-not ((Test-Port 5173) -or (Test-Cmdline "node.exe" "vite" "libertex"))) {
             Log "[frontend] DOWN -> starting"
             Start-Frontend
             Start-Sleep 5
