@@ -46,8 +46,8 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "hide_backtest":      False,   # hide the Backtest page + nav link
         "hide_compare":       False,   # hide the Compare page + nav link
         "nobel_hero":         False,   # consumer "Nobel portfolio" dashboard hero
-        "dashboard_table":    False,   # render dashboard portfolios as a table
-        "hide_history":       False,   # hide History page + nav (merged into dashboard)
+        "dashboard_table":    True,    # render dashboard portfolios as a table
+        "hide_history":       True,    # hide History page + nav (merged into dashboard)
         "advanced_collapsed": False,   # advanced panel collapsed + curated defaults
         "hide_cov_method":    False,   # hide covariance-estimator picker (force LW)
         "hide_universe_presets": False,  # hide "All available"/"MT only" quick buttons
