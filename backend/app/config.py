@@ -50,7 +50,6 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "hide_history":       True,    # hide History page + nav (merged into dashboard)
         "advanced_collapsed": False,   # advanced panel collapsed + curated defaults
         "hide_cov_method":    False,   # hide covariance-estimator picker (force LW)
-        "hide_universe_presets": False,  # hide "All available"/"MT only" quick buttons
         "hide_sparsify":      False,   # hide the sparsify control (keep default on)
         "hide_extra_metrics": False,   # hide CAGR / Sortino / risk-free result cards
     },
@@ -82,7 +81,6 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
         "hide_history":       True,    # history lives on the dashboard now
         "advanced_collapsed": True,    # collapse advanced panel + curated defaults
         "hide_cov_method":    True,    # always Ledoit-Wolf; hide the picker
-        "hide_universe_presets": True,  # slider only; no preset shortcut buttons
         "hide_sparsify":      True,    # sparsify runs at the curated default, no UI
         "hide_extra_metrics": True,    # simpler result set: no CAGR/Sortino/RFR cards
     },

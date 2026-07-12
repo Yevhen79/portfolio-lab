@@ -30,18 +30,10 @@ def load_active_assets(
     categories: Optional[List[str]] = None,
     exclude_symbols: Optional[List[str]] = None,
     trace: Optional[BuildTrace] = None,
-    mt_only: bool = False,
 ) -> List[Asset]:
     q = db.query(Asset).filter(Asset.is_active.is_(True))
     if categories:
         q = q.filter(Asset.category.in_(categories))
-    if mt_only:
-        # Restrict to instruments the user can actually trade in a
-        # MetaTrader 4 / 5 terminal. The is_mt flag is set on both the
-        # friendly-name row ("Apple") and its proper-ticker counterpart
-        # ("AAPL"); the dedup step below collapses the pair to whichever
-        # one is canonical, keeping MT coverage for that underlying.
-        q = q.filter(Asset.is_mt.is_(True))
     assets = q.all()
     initial_count = len(assets)
 
@@ -119,7 +111,6 @@ def assemble_returns(
     trace: Optional[BuildTrace] = None,
     as_of_date: Optional[datetime] = None,
     max_drop_from_peak_pct: float = 0.60,
-    mt_only: bool = False,
 ) -> Tuple[pd.DataFrame, List[Asset]]:
     """Return (monthly_returns_df, list_of_assets_in_order_of_columns).
 
@@ -135,7 +126,6 @@ def assemble_returns(
     """
     assets = load_active_assets(
         db, categories=categories, exclude_symbols=exclude_symbols, trace=trace,
-        mt_only=mt_only,
     )
     if not assets:
         return pd.DataFrame(), []

@@ -172,10 +172,6 @@ export const en = {
     sparsification_help_body:
       "After optimization, drops weights below this threshold and renormalizes the rest so they still sum to 100%. Removes microscopic positions that are just numerical noise from the solver. ON @ 1% means the saved portfolio will only contain meaningful holdings. The dashboard always hides <1% regardless of this setting.",
     universe_size_label: "Instruments for analysis",
-    universe_size_all: "All available (~1500)",
-    mt_only_label: "MT only (~80)",
-    mt_only_help:
-      "Restrict the universe to instruments tradeable in a MetaTrader 4 / 5 terminal. About 80 assets after dedup — mostly blue-chip stocks (Apple, Amazon, Microsoft…), 10 popular crypto, and 3 FX crosses. Click to toggle on / off.",
     max_weight_label: "Max weight per asset",
     max_weight_off: "off",
     max_weight_help_title: "Per-asset concentration cap",

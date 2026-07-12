@@ -90,7 +90,6 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
             "Инструментов для анализа (cap)": max_assets,
             "Категории": req.categories or [],
             "Исключения": req.exclude_symbols or [],
-            "Только MT-инструменты": "да" if req.mt_only else "нет",
             **({"As-of дата (бектест)": as_of_dt.strftime("%Y-%m-%d")} if as_of_dt else {}),
         }
     )
@@ -106,7 +105,6 @@ def build_portfolio(db: Session, req: OptimizeRequest) -> OptimizeResponse:
         trace=trace,
         as_of_date=as_of_dt,
         max_drop_from_peak_pct=req.max_drop_from_peak_pct,
-        mt_only=req.mt_only,
     )
     if returns.empty or len(assets) < 5:
         raise PortfolioBuildError(
